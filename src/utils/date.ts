@@ -81,7 +81,7 @@ export const getWeekdayLabel = (date: Date) => {
 
 export const getMonthMatrix = (value: Date) => {
   const firstDay = startOfMonth(value);
-  const offset = (firstDay.getDay() + 6) % 7;
+  const offset = firstDay.getDay();
   const start = new Date(firstDay);
   start.setDate(firstDay.getDate() - offset);
 
@@ -96,4 +96,33 @@ export const toIsoDateTime = (date: Date, hours = 9) => {
   const copy = new Date(date);
   copy.setHours(hours, 0, 0, 0);
   return copy.toISOString();
+};
+
+export const addHours = (value: string | Date, hours: number) => {
+  const date = toDate(value);
+  const next = new Date(date);
+  next.setHours(next.getHours() + hours);
+  return next;
+};
+
+export const isSameCalendarDay = (left: string | Date, right: string | Date) => {
+  const a = toDate(left);
+  const b = toDate(right);
+
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+};
+
+export const getDurationHours = (start: string | Date, end: string | Date) => {
+  const startDate = toDate(start).getTime();
+  const endDate = toDate(end).getTime();
+
+  if (endDate <= startDate) {
+    return 0;
+  }
+
+  return (endDate - startDate) / (1000 * 60 * 60);
 };

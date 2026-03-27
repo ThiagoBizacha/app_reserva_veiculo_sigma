@@ -1,8 +1,10 @@
 export const typography = {
-  title: 28,
+  display: 28,
+  title: 24,
   section: 20,
-  cardTitle: 17,
-  body: 15,
-  caption: 13,
+  cardTitle: 18,
+  body: 16,
+  bodySmall: 14,
+  caption: 12,
   tiny: 11,
 };

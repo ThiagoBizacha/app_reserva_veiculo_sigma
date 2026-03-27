@@ -1,12 +1,12 @@
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { ScreenContainer } from "@/components";
+import { ScreenContainer, StatusBadge } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
-import { colors, radius, spacing, typography } from "@/theme";
-import { formatDateTime, toIsoDateTime } from "@/utils/date";
+import { colors, radius, shadows, spacing, typography } from "@/theme";
+import { addHours, formatDate, formatDateTime } from "@/utils/date";
 import { getResourceConflicts } from "@/utils/reservations";
 
 interface NewReservationScreenProps {
@@ -14,40 +14,110 @@ interface NewReservationScreenProps {
   initialDate?: string;
 }
 
-type PickerField = "start" | "end" | null;
+type PickerField = "date" | "time" | null;
 
-export function NewReservationScreen({ initialDate, initialResourceId }: NewReservationScreenProps) {
-  const { createReservation, reservations, resources } = useReservationStore();
-  const defaultDate = initialDate ? new Date(initialDate) : new Date(2026, 2, 27, 9, 0, 0);
+const durationOptions = [1, 2, 3, 4] as const;
+
+export function NewReservationScreen({
+  initialDate,
+  initialResourceId,
+}: NewReservationScreenProps) {
+  const { createReservation, reservations, resources, getResourceStatus } = useReservationStore();
+  const seededDate = initialDate ? new Date(initialDate) : new Date(2026, 2, 27, 8, 0, 0);
+  const defaultDay = new Date(
+    seededDate.getFullYear(),
+    seededDate.getMonth(),
+    seededDate.getDate(),
+    0,
+    0,
+    0,
+    0
+  );
+  const defaultTime = new Date(seededDate);
+  defaultTime.setMinutes(0, 0, 0);
+
+  const vehicleOptions = resources.filter((item) => item.category === "Veiculo");
 
   const [resourceId, setResourceId] = useState(initialResourceId ?? "");
   const [purpose, setPurpose] = useState("");
   const [base, setBase] = useState("");
   const [notes, setNotes] = useState("");
-  const [startDate, setStartDate] = useState(toIsoDateTime(defaultDate, 9));
-  const [endDate, setEndDate] = useState(toIsoDateTime(defaultDate, 18));
+  const [reservationDate, setReservationDate] = useState(defaultDay);
+  const [pickupTime, setPickupTime] = useState(defaultTime);
+  const [durationHours, setDurationHours] = useState<(typeof durationOptions)[number]>(1);
   const [pickerField, setPickerField] = useState<PickerField>(null);
   const [showResourceModal, setShowResourceModal] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: "error" | "success"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ type: "error" | "success"; message: string } | null>(
+    null
+  );
 
-  const selectedResource = resources.find((resource) => resource.id === resourceId);
+  const startDate = useMemo(() => {
+    const next = new Date(reservationDate);
+    next.setHours(pickupTime.getHours(), pickupTime.getMinutes(), 0, 0);
+    return next.toISOString();
+  }, [pickupTime, reservationDate]);
+
+  const endDate = useMemo(() => addHours(startDate, durationHours).toISOString(), [durationHours, startDate]);
+
+  const selectedResource = vehicleOptions.find((resource) => resource.id === resourceId);
   const conflicts = useMemo(
     () => (resourceId ? getResourceConflicts(reservations, resourceId, startDate, endDate) : []),
     [endDate, reservations, resourceId, startDate]
   );
+  const selectedResourceStatus = selectedResource
+    ? getResourceStatus(selectedResource.id, new Date(startDate))
+    : "Disponivel";
+  const isSubmitDisabled = !resourceId || !purpose.trim() || !base.trim() || conflicts.length > 0;
 
-  const onChangeDate = (field: PickerField) => (event: DateTimePickerEvent, selected?: Date) => {
-    if (Platform.OS === "android") setPickerField(null);
-    if (event.type === "dismissed" || !selected || !field) return;
-    if (field === "start") setStartDate(selected.toISOString());
-    else setEndDate(selected.toISOString());
-  };
+  useEffect(() => {
+    if (selectedResource && !base.trim()) {
+      setBase(selectedResource.location);
+    }
+  }, [base, selectedResource]);
+
+  const onChangeDate =
+    (field: PickerField) => (event: DateTimePickerEvent, selected?: Date) => {
+      if (Platform.OS === "android") {
+        setPickerField(null);
+      }
+
+      if (event.type === "dismissed" || !selected || !field) {
+        return;
+      }
+
+      if (field === "date") {
+        const nextDate = new Date(selected);
+        nextDate.setHours(0, 0, 0, 0);
+        setReservationDate(nextDate);
+        return;
+      }
+
+      const nextTime = new Date(pickupTime);
+      nextTime.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+      setPickupTime(nextTime);
+    };
 
   const handleSave = () => {
-    const result = createReservation({ resourceId, startDate, endDate, purpose, base, notes });
+    const result = createReservation({
+      resourceId,
+      startDate,
+      endDate,
+      durationHours,
+      purpose,
+      base,
+      notes,
+    });
+
     setFeedback({ type: result.success ? "success" : "error", message: result.message });
+
     if (result.success && result.reservation) {
-      setTimeout(() => router.replace(`/reservation/${result.reservation?.id}`), 500);
+      const createdReservation = result.reservation;
+      setTimeout(() => {
+        router.replace({
+          pathname: "/reservation/[id]",
+          params: { id: createdReservation.id },
+        });
+      }, 500);
     }
   };
 
@@ -57,55 +127,123 @@ export function NewReservationScreen({ initialDate, initialResourceId }: NewRese
         <Pressable onPress={() => router.back()}>
           <Feather name="arrow-left" size={24} color={colors.white} />
         </Pressable>
-        <Text style={styles.headerTitle}>Reserva de Veículo</Text>
+        <Text style={styles.headerTitle}>Reserva de Veiculo</Text>
         <View style={styles.headerSpacer} />
       </View>
 
       <View style={styles.heroCard}>
-        <Text style={styles.heroTitle}>Nova Solicitação</Text>
-        <Text style={styles.heroSubtitle}>Selecione veículo, período e contexto operacional.</Text>
+        <Text style={styles.heroTitle}>Nova Reserva</Text>
+        <Text style={styles.heroSubtitle}>
+          Escolha o horario de retirada e a duracao de uso. Cada reserva pode ter no minimo 1h e
+          no maximo 4h no mesmo dia.
+        </Text>
       </View>
 
-      <Section title="Veículo">
+      <Section title="Veiculo">
         <Pressable style={styles.selector} onPress={() => setShowResourceModal(true)}>
           <Text style={[styles.selectorText, !selectedResource && styles.selectorPlaceholder]}>
-            {selectedResource ? `${selectedResource.name} • ${selectedResource.code}` : "Selecionar veículo"}
+            {selectedResource
+              ? `${selectedResource.plate ?? selectedResource.code} | ${selectedResource.brand ?? ""} ${selectedResource.model ?? selectedResource.name}`
+              : "Selecionar veiculo"}
           </Text>
-          <Feather name="chevron-down" size={18} color="#777" />
+          <Feather name="chevron-down" size={18} color={colors.textMuted} />
         </Pressable>
-      </Section>
 
-      <Section title="Período da Reserva">
-        <Pressable style={styles.selector} onPress={() => setPickerField("start")}>
-          <Text style={styles.selectorText}>{formatDateTime(startDate)}</Text>
-          <Feather name="calendar" size={18} color="#777" />
-        </Pressable>
-        <Pressable style={styles.selector} onPress={() => setPickerField("end")}>
-          <Text style={styles.selectorText}>{formatDateTime(endDate)}</Text>
-          <Feather name="calendar" size={18} color="#777" />
-        </Pressable>
-        {new Date(endDate) < new Date(startDate) ? (
-          <Text style={styles.errorText}>A data final precisa ser posterior à inicial.</Text>
+        {selectedResource ? (
+          <View style={styles.resourceSnapshot}>
+            <View style={styles.resourceSnapshotTop}>
+              <View style={styles.resourceSnapshotCopy}>
+                <Text style={styles.resourceSnapshotTitle}>{selectedResource.name}</Text>
+                <Text style={styles.resourceSnapshotMeta}>
+                  {selectedResource.plate ?? selectedResource.code} | {selectedResource.location}
+                </Text>
+                <Text style={styles.resourceSnapshotMeta}>
+                  {selectedResource.rentalCompany ?? "-"} | Km {selectedResource.currentMileage ?? "-"} | {selectedResource.responsible}
+                </Text>
+              </View>
+              <StatusBadge status={selectedResourceStatus} kind="resource" />
+            </View>
+          </View>
         ) : null}
       </Section>
 
-      <Section title="Dados Operacionais">
-        <Field label="Finalidade" value={purpose} onChangeText={setPurpose} placeholder="Ex.: Visita técnica em unidade operacional" />
-        <Field label="Local / Base" value={base} onChangeText={setBase} placeholder="Ex.: Sede BH" />
-        <Field label="Observações" value={notes} onChangeText={setNotes} placeholder="Detalhes adicionais, passageiros, instruções." multiline />
+      <Section title="Janela da Reserva">
+        <Pressable style={styles.selector} onPress={() => setPickerField("date")}>
+          <Text style={styles.selectorText}>{formatDate(reservationDate)}</Text>
+          <Feather name="calendar" size={18} color={colors.textMuted} />
+        </Pressable>
+
+        <Pressable style={styles.selector} onPress={() => setPickerField("time")}>
+          <Text style={styles.selectorText}>Retirada: {formatDateTime(startDate)}</Text>
+          <Feather name="clock" size={18} color={colors.textMuted} />
+        </Pressable>
+
+        <View style={styles.durationBlock}>
+          <Text style={styles.fieldLabel}>Tempo de uso</Text>
+          <View style={styles.durationRow}>
+            {durationOptions.map((option) => {
+              const active = durationHours === option;
+
+              return (
+                <Pressable
+                  key={option}
+                  style={[styles.durationChip, active && styles.durationChipActive]}
+                  onPress={() => setDurationHours(option)}
+                >
+                  <Text style={[styles.durationChipText, active && styles.durationChipTextActive]}>
+                    {option}h
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.periodSummary}>
+          <Text style={styles.periodSummaryTitle}>Previsao de uso</Text>
+          <Text style={styles.periodSummaryText}>Retirada: {formatDateTime(startDate)}</Text>
+          <Text style={styles.periodSummaryText}>Previsao de devolucao: {formatDateTime(endDate)}</Text>
+          <Text style={styles.periodSummaryText}>Duracao planejada: {durationHours} hora(s)</Text>
+        </View>
       </Section>
 
-      <Section title="Conflitos do Período">
+      <Section title="Dados Operacionais">
+        <Field
+          label="Finalidade"
+          value={purpose}
+          onChangeText={setPurpose}
+          placeholder="Ex.: Visita tecnica em unidade operacional"
+        />
+        <Field
+          label="Local / Base"
+          value={base}
+          onChangeText={setBase}
+          placeholder={"Ex.: Ara\u00E7ua\u00ED - MG"}
+        />
+        <Field
+          label="Observacoes"
+          value={notes}
+          onChangeText={setNotes}
+          placeholder="Detalhes adicionais, passageiros e instrucoes."
+          multiline
+        />
+      </Section>
+
+      <Section title="Bloqueios por Horario">
         {conflicts.length === 0 ? (
           <View style={styles.freeState}>
-            <Feather name="check-circle" size={18} color="#2E8C38" />
-            <Text style={styles.freeStateText}>Nenhum conflito encontrado para o período selecionado.</Text>
+            <Feather name="check-circle" size={18} color={colors.success} />
+            <Text style={styles.freeStateText}>
+              Nao ha bloqueio neste horario. O sistema preve devolucao em {formatDateTime(endDate)}.
+            </Text>
           </View>
         ) : (
           conflicts.map((conflict) => (
             <View key={conflict.id} style={styles.conflictCard}>
               <Text style={styles.conflictTitle}>{conflict.code}</Text>
-              <Text style={styles.conflictLine}>{formatDateTime(conflict.startDate)} até {formatDateTime(conflict.endDate)}</Text>
+              <Text style={styles.conflictLine}>
+                Bloqueado de {formatDateTime(conflict.startDate)} ate {formatDateTime(conflict.endDate)}
+              </Text>
               <Text style={styles.conflictLine}>{conflict.purpose}</Text>
             </View>
           ))
@@ -113,35 +251,69 @@ export function NewReservationScreen({ initialDate, initialResourceId }: NewRese
       </Section>
 
       {feedback ? (
-        <View style={[styles.feedback, feedback.type === "error" ? styles.feedbackError : styles.feedbackSuccess]}>
-          <Text style={[styles.feedbackText, feedback.type === "error" ? styles.feedbackTextError : styles.feedbackTextSuccess]}>
+        <View
+          style={[
+            styles.feedback,
+            feedback.type === "error" ? styles.feedbackError : styles.feedbackSuccess,
+          ]}
+        >
+          <Text
+            style={[
+              styles.feedbackText,
+              feedback.type === "error" ? styles.feedbackTextError : styles.feedbackTextSuccess,
+            ]}
+          >
             {feedback.message}
           </Text>
         </View>
       ) : null}
 
-      <Pressable style={styles.primaryButton} onPress={handleSave}>
-        <Text style={styles.primaryButtonText}>Salvar Reserva</Text>
+      <Pressable
+        style={[styles.primaryButton, isSubmitDisabled && styles.primaryButtonDisabled]}
+        onPress={handleSave}
+        disabled={isSubmitDisabled}
+      >
+        <Text style={styles.primaryButtonText}>Salvar reserva</Text>
       </Pressable>
 
-      <Modal visible={showResourceModal} transparent animationType="slide" onRequestClose={() => setShowResourceModal(false)}>
+      <Modal
+        visible={showResourceModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowResourceModal(false)}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Selecionar veículo</Text>
+            <Text style={styles.modalTitle}>Selecionar veiculo</Text>
             <View style={styles.modalList}>
-              {resources.filter((item) => item.category === "Veiculo").map((resource) => (
-                <Pressable
-                  key={resource.id}
-                  style={[styles.modalItem, resource.id === resourceId && styles.modalItemActive]}
-                  onPress={() => {
-                    setResourceId(resource.id);
-                    setShowResourceModal(false);
-                  }}
-                >
-                  <Text style={styles.modalItemTitle}>{resource.name}</Text>
-                  <Text style={styles.modalItemMeta}>{resource.code} • {resource.location}</Text>
-                </Pressable>
-              ))}
+              {vehicleOptions.map((resource) => {
+                const optionStatus = getResourceStatus(resource.id, new Date(startDate));
+
+                return (
+                  <Pressable
+                    key={resource.id}
+                    style={[styles.modalItem, resource.id === resourceId && styles.modalItemActive]}
+                    onPress={() => {
+                      setResourceId(resource.id);
+                      setBase(resource.location);
+                      setShowResourceModal(false);
+                    }}
+                  >
+                    <View style={styles.modalItemTop}>
+                      <View style={styles.modalItemCopy}>
+                        <Text style={styles.modalItemTitle}>{resource.name}</Text>
+                        <Text style={styles.modalItemMeta}>
+                          {resource.plate ?? resource.code} | {resource.brand ?? "-"} {resource.model ?? ""} | {resource.location}
+                        </Text>
+                        <Text style={styles.modalItemMeta}>
+                          {resource.rentalCompany ?? "-"} | Km {resource.currentMileage ?? "-"}
+                        </Text>
+                      </View>
+                      <StatusBadge status={optionStatus} kind="resource" />
+                    </View>
+                  </Pressable>
+                );
+              })}
             </View>
             <Pressable style={styles.secondaryButton} onPress={() => setShowResourceModal(false)}>
               <Text style={styles.secondaryButtonText}>Fechar</Text>
@@ -152,9 +324,9 @@ export function NewReservationScreen({ initialDate, initialResourceId }: NewRese
 
       {pickerField ? (
         <DateTimePicker
-          value={new Date(pickerField === "start" ? startDate : endDate)}
-          mode="datetime"
-          display={Platform.OS === "ios" ? "inline" : "default"}
+          value={pickerField === "date" ? reservationDate : pickupTime}
+          mode={pickerField}
+          display={Platform.OS === "ios" ? "spinner" : "default"}
           onChange={onChangeDate(pickerField)}
         />
       ) : null}
@@ -191,7 +363,7 @@ function Field({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor="#939393"
+        placeholderTextColor={colors.textMuted}
         multiline={multiline}
         style={[styles.textInput, multiline && styles.textInputMultiline]}
       />
@@ -205,41 +377,42 @@ const styles = StyleSheet.create({
     marginTop: -spacing.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    backgroundColor: "#29631B",
+    backgroundColor: colors.primaryDark,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
   headerTitle: {
     color: colors.white,
-    fontSize: 22,
-    fontWeight: "800",
+    fontSize: typography.section,
+    fontWeight: "700",
   },
   headerSpacer: {
     width: 24,
   },
   heroCard: {
-    backgroundColor: "#EEF7EC",
-    borderRadius: 18,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.xl,
     padding: spacing.md,
+    gap: spacing.xs,
   },
   heroTitle: {
-    color: "#212121",
+    color: colors.text,
     fontSize: typography.section,
-    fontWeight: "800",
+    fontWeight: "700",
   },
   heroSubtitle: {
-    color: "#666",
+    color: colors.textSecondary,
     fontSize: typography.body,
-    marginTop: 4,
+    lineHeight: 22,
   },
   section: {
     gap: spacing.sm,
   },
   sectionTitle: {
-    color: "#285F1C",
+    color: colors.primaryDark,
     fontSize: typography.cardTitle,
-    fontWeight: "800",
+    fontWeight: "700",
   },
   sectionContent: {
     gap: spacing.sm,
@@ -247,8 +420,8 @@ const styles = StyleSheet.create({
   selector: {
     minHeight: 52,
     borderWidth: 1,
-    borderColor: "#D5D5D5",
-    borderRadius: 12,
+    borderColor: colors.border,
+    borderRadius: radius.md,
     backgroundColor: colors.surface,
     paddingHorizontal: spacing.md,
     flexDirection: "row",
@@ -256,33 +429,102 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   selectorText: {
-    color: "#2C2C2C",
+    color: colors.text,
     fontSize: typography.body,
+    flex: 1,
   },
   selectorPlaceholder: {
-    color: "#8B8B8B",
+    color: colors.textMuted,
   },
-  errorText: {
-    color: colors.danger,
-    fontSize: typography.caption,
+  resourceSnapshot: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.soft,
+  },
+  resourceSnapshotTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
+  resourceSnapshotCopy: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  resourceSnapshotTitle: {
+    color: colors.text,
+    fontSize: typography.body,
     fontWeight: "700",
   },
-  fieldWrap: {
-    gap: 6,
+  resourceSnapshotMeta: {
+    color: colors.textSecondary,
+    fontSize: typography.bodySmall,
+  },
+  durationBlock: {
+    gap: spacing.xs,
   },
   fieldLabel: {
-    color: "#4F4F4F",
+    color: colors.textSecondary,
     fontSize: typography.caption,
     fontWeight: "700",
+  },
+  durationRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  durationChip: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  durationChipActive: {
+    backgroundColor: colors.primaryDark,
+    borderColor: colors.primaryDark,
+  },
+  durationChipText: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: "700",
+  },
+  durationChipTextActive: {
+    color: colors.white,
+  },
+  periodSummary: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.xs,
+  },
+  periodSummaryTitle: {
+    color: colors.primaryDark,
+    fontSize: typography.body,
+    fontWeight: "700",
+  },
+  periodSummaryText: {
+    color: colors.textSecondary,
+    fontSize: typography.bodySmall,
+  },
+  fieldWrap: {
+    gap: spacing.xs,
   },
   textInput: {
     minHeight: 52,
     borderWidth: 1,
-    borderColor: "#D5D5D5",
-    borderRadius: 12,
+    borderColor: colors.border,
+    borderRadius: radius.md,
     backgroundColor: colors.surface,
     paddingHorizontal: spacing.md,
-    color: "#2C2C2C",
+    color: colors.text,
     fontSize: typography.body,
   },
   textInputMultiline: {
@@ -291,45 +533,45 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   freeState: {
-    minHeight: 48,
-    borderRadius: 12,
-    backgroundColor: "#EDF8EF",
+    minHeight: 56,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
     paddingHorizontal: spacing.md,
   },
   freeStateText: {
-    color: "#2E8C38",
+    color: colors.success,
     fontSize: typography.body,
     flex: 1,
   },
   conflictCard: {
-    borderRadius: 14,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: "#F0C8C8",
-    backgroundColor: "#FFF5F5",
+    borderColor: `${colors.danger}33`,
+    backgroundColor: `${colors.danger}10`,
     padding: spacing.md,
+    gap: spacing.xs,
   },
   conflictTitle: {
-    color: "#922B2B",
+    color: colors.danger,
     fontSize: typography.body,
-    fontWeight: "800",
+    fontWeight: "700",
   },
   conflictLine: {
-    color: "#6A4545",
+    color: colors.textSecondary,
     fontSize: typography.caption,
-    marginTop: 4,
   },
   feedback: {
-    borderRadius: 12,
+    borderRadius: radius.md,
     padding: spacing.md,
   },
   feedbackError: {
-    backgroundColor: "#FCEBEC",
+    backgroundColor: `${colors.danger}10`,
   },
   feedbackSuccess: {
-    backgroundColor: "#E7F6EF",
+    backgroundColor: colors.primarySoft,
   },
   feedbackText: {
     fontSize: typography.caption,
@@ -339,19 +581,23 @@ const styles = StyleSheet.create({
     color: colors.danger,
   },
   feedbackTextSuccess: {
-    color: colors.success,
+    color: colors.primaryDark,
   },
   primaryButton: {
     minHeight: 54,
-    borderRadius: 14,
-    backgroundColor: "#295F16",
+    borderRadius: radius.lg,
+    backgroundColor: colors.primaryDark,
     alignItems: "center",
     justifyContent: "center",
+    ...shadows.soft,
+  },
+  primaryButtonDisabled: {
+    backgroundColor: colors.disabled,
   },
   primaryButtonText: {
     color: colors.white,
     fontSize: typography.body,
-    fontWeight: "800",
+    fontWeight: "700",
   },
   modalOverlay: {
     flex: 1,
@@ -361,49 +607,58 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: colors.surface,
     padding: spacing.lg,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
     gap: spacing.md,
   },
   modalTitle: {
-    color: "#1F1F1F",
+    color: colors.text,
     fontSize: typography.section,
-    fontWeight: "800",
+    fontWeight: "700",
   },
   modalList: {
     gap: spacing.sm,
   },
   modalItem: {
     padding: spacing.md,
-    borderRadius: 14,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: "#D9D9D9",
-    backgroundColor: "#F7FAF7",
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
   },
   modalItemActive: {
-    borderColor: "#2E8C38",
-    backgroundColor: "#ECF7EE",
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  modalItemTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
+  modalItemCopy: {
+    flex: 1,
+    gap: spacing.xs,
   },
   modalItemTitle: {
-    color: "#232323",
+    color: colors.text,
     fontSize: typography.body,
-    fontWeight: "800",
+    fontWeight: "700",
   },
   modalItemMeta: {
-    color: "#666",
+    color: colors.textSecondary,
     fontSize: typography.caption,
-    marginTop: 4,
   },
   secondaryButton: {
     minHeight: 48,
-    borderRadius: 12,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: "#D9D9D9",
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
   secondaryButtonText: {
-    color: "#2C2C2C",
+    color: colors.text,
     fontSize: typography.body,
     fontWeight: "700",
   },

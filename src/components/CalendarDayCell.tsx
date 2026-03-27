@@ -40,7 +40,7 @@ export function CalendarDayCell({
 
 const styles = StyleSheet.create({
   cell: {
-    width: "13.5%",
+    width: "100%",
     aspectRatio: 0.78,
     borderRadius: radius.md,
     alignItems: "center",

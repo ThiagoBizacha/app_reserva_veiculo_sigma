@@ -89,6 +89,33 @@ Se preferir abrir primeiro o servidor:
 npm run start
 ```
 
+### Abrir no celular em outra rede
+
+Se o celular nao estiver na mesma rede Wi-Fi do computador, inicie o Expo com tunel:
+
+```bash
+npx expo start --tunnel
+```
+
+Ou com limpeza de cache:
+
+```bash
+npx expo start --tunnel --clear
+```
+
+Depois:
+
+- abra o `Expo Go` no celular;
+- escaneie o QR code exibido no terminal;
+- aguarde o app abrir pelo tunel.
+
+Se o tunel falhar, os pontos mais comuns sao:
+
+- VPN ativa;
+- firewall bloqueando `node.exe`;
+- instabilidade temporaria do `ngrok`;
+- rede corporativa bloqueando tunel.
+
 ## Decisões técnicas
 
 - O design system foi centralizado em `src/theme` para cores, tipografia, espaçamentos, raios e sombras.

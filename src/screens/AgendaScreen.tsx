@@ -1,298 +1,601 @@
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { ScreenContainer } from "@/components";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { EmptyState, ScreenContainer, StatusBadge } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
-import { colors, radius, spacing, typography } from "@/theme";
-import { addMonths, formatMonthYear, getMonthMatrix } from "@/utils/date";
-import { getCalendarDayState, getMonthlyReservations, getResourceById } from "@/utils/reservations";
+import { colors, radius, shadows, spacing, typography } from "@/theme";
+import {
+  addMonths,
+  formatDate,
+  formatDateTime,
+  formatMonthYear,
+  getMonthMatrix,
+  isSameDay,
+} from "@/utils/date";
+import { getCalendarDayStateForResource } from "@/utils/reservations";
+import { CalendarDayCell } from "@/components/CalendarDayCell";
 
-const weekLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+interface AgendaScreenProps {
+  initialResourceId?: string;
+}
 
-const stateColors = {
-  emUso: "#F08A00",
-  manutencao: "#D72828",
-  reservado: "#229342",
-  disponivel: "#B5B5B5",
+const weekLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
+
+const availabilityCopy = {
+  disponivel: {
+    title: "Disponivel",
+    description: "O veiculo esta livre para uma nova reserva nesta data.",
+    color: colors.success,
+    backgroundColor: `${colors.success}12`,
+  },
+  reservado: {
+    title: "Reservado",
+    description: "Ja existe um bloqueio parcial neste dia. Consulte os horarios antes de reservar.",
+    color: colors.info,
+    backgroundColor: `${colors.info}12`,
+  },
+  emUso: {
+    title: "Em uso",
+    description: "O veiculo possui uso registrado neste dia. Consulte o horario de devolucao.",
+    color: colors.warning,
+    backgroundColor: "#FFF5E8",
+  },
+  manutencao: {
+    title: "Manutencao",
+    description: "O veiculo esta indisponivel por manutencao nesta data.",
+    color: colors.danger,
+    backgroundColor: `${colors.danger}10`,
+  },
 };
 
-export function AgendaScreen() {
-  const { resources, reservations } = useReservationStore();
-  const [month, setMonth] = useState(new Date(2026, 2, 1));
-  const matrix = useMemo(() => getMonthMatrix(month), [month]);
-  const vehicle = resources.find((item) => item.category === "Veiculo") ?? resources[0];
-  const monthlyReservations = useMemo(() => getMonthlyReservations(reservations, month), [month, reservations]);
+export function AgendaScreen({ initialResourceId }: AgendaScreenProps) {
+  const {
+    resources,
+    getAvailabilityForDate,
+    getReservationsForDay,
+    getReservationsForResource,
+    getResourceStatus,
+  } = useReservationStore();
+  const vehicles = resources.filter((resource) => resource.category === "Veiculo");
+  const today = new Date();
+  const initialVehicle = vehicles.find((resource) => resource.id === initialResourceId) ?? vehicles[0];
+
+  const [selectedResourceId, setSelectedResourceId] = useState(initialVehicle?.id ?? "");
+  const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+  const [selectedDate, setSelectedDate] = useState(today);
+  const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
+
+  const selectedResource = vehicles.find((resource) => resource.id === selectedResourceId) ?? vehicles[0];
+  const selectedResourceStatus = selectedResource
+    ? getResourceStatus(selectedResource.id, selectedDate)
+    : "Disponivel";
+  const monthMatrix = useMemo(() => getMonthMatrix(currentMonth), [currentMonth]);
+  const calendarRows = useMemo(
+    () => Array.from({ length: 6 }, (_, index) => monthMatrix.slice(index * 7, index * 7 + 7)),
+    [monthMatrix]
+  );
+  const resourceReservations = selectedResource
+    ? getReservationsForResource(selectedResource.id)
+    : [];
+  const selectedDayReservations = selectedResource
+    ? getReservationsForDay(selectedResource.id, selectedDate)
+    : [];
+  const selectedDayAvailability = selectedResource
+    ? getAvailabilityForDate(selectedResource.id, selectedDate)
+    : { state: "disponivel" as const, reservations: [], isAvailable: false };
+  const dayCard = availabilityCopy[selectedDayAvailability.state];
+
+  const selectedDayStart = new Date(selectedDate);
+  selectedDayStart.setHours(0, 0, 0, 0);
+  const todayStart = new Date(today);
+  todayStart.setHours(0, 0, 0, 0);
+  const isPastDay = selectedDayStart < todayStart;
+
+  const handleMonthChange = (offset: number) => {
+    const nextMonth = addMonths(currentMonth, offset);
+    const maxDay = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+    const targetDay = Math.min(selectedDate.getDate(), maxDay);
+
+    setCurrentMonth(nextMonth);
+    setSelectedDate(new Date(nextMonth.getFullYear(), nextMonth.getMonth(), targetDay));
+  };
+
+  const handleOpenNewReservation = () => {
+    if (!selectedResource) {
+      return;
+    }
+
+    router.push({
+      pathname: "/reservation/new",
+      params: { resourceId: selectedResource.id, date: selectedDate.toISOString() },
+    });
+  };
 
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Agenda - {vehicle.code}</Text>
-        <View style={styles.availablePill}>
-          <Text style={styles.availablePillText}>Disponível</Text>
-        </View>
+        <Text style={styles.headerTitle}>Agenda</Text>
+        <Text style={styles.headerSubtitle}>
+          Escolha o veiculo, toque no dia e tome a proxima acao sem sair do contexto.
+        </Text>
       </View>
 
-      <View style={styles.vehicleBanner}>
-        <View style={styles.vehicleRow}>
-          <Feather name="truck" size={22} color="#3C6E3C" />
-          <Text style={styles.vehicleTitle}>{vehicle.name} | Prata | 2023</Text>
-        </View>
-        <View style={styles.vehicleRow}>
-          <Feather name="map-pin" size={20} color="#3C6E3C" />
-          <Text style={styles.vehicleMeta}>Local</Text>
-        </View>
-        <Text style={styles.vehicleMetaStrong}>Base: {vehicle.location} | Resp: {vehicle.responsible}</Text>
+      <View style={styles.selectorBlock}>
+        <Text style={styles.selectorLabel}>Veiculo</Text>
+        <Pressable style={styles.selector} onPress={() => setIsVehicleModalOpen(true)}>
+          <Text style={styles.selectorText}>
+            {selectedResource
+              ? `${selectedResource.name} | ${selectedResource.plate ?? selectedResource.code}`
+              : "Selecionar veiculo"}
+          </Text>
+          <Feather name="chevron-down" size={18} color={colors.textMuted} />
+        </Pressable>
       </View>
+
+      {selectedResource ? (
+        <View style={styles.resourceSummary}>
+          <View style={styles.resourceSummaryTop}>
+            <View style={styles.resourceTitleRow}>
+              <Feather name="truck" size={18} color={colors.primaryDark} />
+              <Text style={styles.resourceTitle}>{selectedResource.name}</Text>
+            </View>
+            <StatusBadge status={selectedResourceStatus} kind="resource" />
+          </View>
+          <Text style={styles.resourceMeta}>
+            {selectedResource.plate ?? selectedResource.code} | {selectedResource.brand ?? "-"}{" "}
+            {selectedResource.model ?? ""}
+          </Text>
+          <Text style={styles.resourceMeta}>
+            {selectedResource.location} | {selectedResource.rentalCompany ?? "-"} | Km{" "}
+            {selectedResource.currentMileage ?? "-"}
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.monthHeader}>
-        <Pressable onPress={() => setMonth((current) => addMonths(current, -1))}>
-          <Feather name="chevron-left" size={26} color="#202020" />
+        <Pressable style={styles.monthButton} onPress={() => handleMonthChange(-1)}>
+          <Feather name="chevron-left" size={20} color={colors.primaryDark} />
         </Pressable>
-        <Text style={styles.monthTitle}>{formatMonthYear(month)}</Text>
-        <Pressable onPress={() => setMonth((current) => addMonths(current, 1))}>
-          <Feather name="chevron-right" size={26} color="#202020" />
+        <Text style={styles.monthTitle}>{formatMonthYear(currentMonth)}</Text>
+        <Pressable style={styles.monthButton} onPress={() => handleMonthChange(1)}>
+          <Feather name="chevron-right" size={20} color={colors.primaryDark} />
         </Pressable>
       </View>
 
       <View style={styles.calendarCard}>
         <View style={styles.weekHeader}>
-          {weekLabels.map((item) => (
-            <Text key={item} style={styles.weekText}>
-              {item}
+          {weekLabels.map((day) => (
+            <Text key={day} style={styles.weekLabel}>
+              {day}
             </Text>
           ))}
         </View>
         <View style={styles.grid}>
-          {matrix.map((day) => {
-            const state = getCalendarDayState(day, resources, reservations);
-            const inMonth = day.getMonth() === month.getMonth();
-            return (
-              <Pressable key={day.toISOString()} style={styles.dayCell}>
-                <Text style={[styles.dayNumber, !inMonth && styles.dayNumberMuted]}>{day.getDate()}</Text>
-                {inMonth ? (
-                  <>
-                    <View style={[styles.dayDot, { backgroundColor: stateColors[state] }]} />
-                    {(day.getDate() === 5 || day.getDate() === 6) && state === "emUso" ? (
-                      <Text style={[styles.dayStateText, { color: stateColors[state] }]}>Em Uso</Text>
-                    ) : null}
-                    {day.getDate() === 8 && state === "manutencao" ? (
-                      <Text style={[styles.dayStateText, { color: stateColors[state] }]}>Manutenção</Text>
-                    ) : null}
-                    {day.getDate() === 10 && state === "reservado" ? (
-                      <Text style={[styles.dayStateText, { color: stateColors[state] }]}>Reservada</Text>
-                    ) : null}
-                  </>
-                ) : null}
-              </Pressable>
-            );
-          })}
+          {calendarRows.map((row, rowIndex) => (
+            <View key={`week-${rowIndex}`} style={styles.gridRow}>
+              {row.map((day) => (
+                <View key={day.toISOString()} style={styles.gridCell}>
+                  <CalendarDayCell
+                    dayNumber={day.getDate()}
+                    isCurrentMonth={day.getMonth() === currentMonth.getMonth()}
+                    isSelected={isSameDay(day, selectedDate)}
+                    isToday={isSameDay(day, today)}
+                    state={
+                      selectedResource
+                        ? getCalendarDayStateForResource(day, selectedResource, resourceReservations)
+                        : "disponivel"
+                    }
+                    onPress={() => setSelectedDate(day)}
+                  />
+                </View>
+              ))}
+            </View>
+          ))}
         </View>
       </View>
 
-      <View style={styles.legend}>
-        <LegendItem color={stateColors.emUso} label="Em Uso" />
-        <LegendItem color={stateColors.manutencao} label="Manutenção" />
-        <LegendItem color={stateColors.reservado} label="Reservada" />
-        <LegendItem color={stateColors.disponivel} label="Disponível" />
+      <View style={[styles.dayCard, { backgroundColor: dayCard.backgroundColor, borderColor: dayCard.color }]}>
+        <View style={styles.dayCardHeader}>
+          <View style={styles.dayCardCopy}>
+            <Text style={styles.dayCardTitle}>{formatDate(selectedDate)}</Text>
+            <Text style={styles.dayCardDescription}>
+              {isPastDay
+                ? "A data selecionada esta no historico. Consulte o que aconteceu neste dia."
+                : dayCard.description}
+            </Text>
+          </View>
+          <View style={[styles.availabilityPill, { backgroundColor: dayCard.color }]}>
+            <Text style={styles.availabilityPillText}>{dayCard.title}</Text>
+          </View>
+        </View>
+
+        <View style={styles.dayActions}>
+          {!isPastDay && selectedDayAvailability.state !== "manutencao" ? (
+            <Pressable style={styles.primaryAction} onPress={handleOpenNewReservation}>
+              <Text style={styles.primaryActionText}>Escolher horario neste dia</Text>
+            </Pressable>
+          ) : null}
+
+          {selectedDayAvailability.reservations.length > 0 ? (
+            <Pressable
+              style={styles.secondaryAction}
+              onPress={() =>
+                router.push({
+                  pathname: "/reservation/[id]",
+                  params: { id: selectedDayAvailability.reservations[0].id },
+                })
+              }
+            >
+              <Text style={styles.secondaryActionText}>Abrir reserva do dia</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
 
-      <Text style={styles.sectionTitle}>Reservas do Mês</Text>
-      <View style={styles.monthReservations}>
-        {monthlyReservations.slice(0, 2).map((reservation, index) => {
-          const bg = index === 0 ? "#F08A00" : "#229342";
-          const resource = getResourceById(resources, reservation.resourceId);
-          return (
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Reservas do dia</Text>
+        <Text style={styles.sectionSubtitle}>{selectedDayReservations.length} item(ns)</Text>
+      </View>
+
+      <View style={styles.list}>
+        {selectedDayReservations.length === 0 ? (
+          <EmptyState
+            icon="calendar"
+            title="Nenhuma reserva para este dia"
+            description="Se a data estiver livre, siga para a reserva direto pelo card acima."
+          />
+        ) : (
+          selectedDayReservations.map((reservation) => (
             <Pressable
               key={reservation.id}
-              style={[styles.reservationBar, { backgroundColor: bg }]}
-              onPress={() => router.push(`/reservation/${reservation.id}`)}
+              style={styles.reservationRow}
+              onPress={() =>
+                router.push({ pathname: "/reservation/[id]", params: { id: reservation.id } })
+              }
             >
-              <Text style={styles.reservationBarText}>
-                {reservation.startDate.slice(8, 10)}-{reservation.endDate.slice(8, 10)}/{reservation.startDate.slice(5, 7)} | {resource?.name.split(" ")[0]} | {reservation.base} | {reservation.status}
-              </Text>
+              <View style={styles.reservationRowCopy}>
+                <Text style={styles.reservationRowTitle}>{reservation.code}</Text>
+                <Text style={styles.reservationRowText}>
+                  {formatDateTime(reservation.startDate)} ate {formatDateTime(reservation.endDate)}
+                </Text>
+                <Text style={styles.reservationRowText}>{reservation.purpose}</Text>
+              </View>
+              <StatusBadge status={reservation.status} kind="reservation" />
             </Pressable>
-          );
-        })}
+          ))
+        )}
       </View>
 
-      <Pressable style={styles.primaryCta} onPress={() => router.push(`/reservation/new?resourceId=${vehicle.id}`)}>
-        <Text style={styles.primaryCtaText}>Nova Reserva para este Veículo</Text>
-      </Pressable>
-    </ScreenContainer>
-  );
-}
+      <Modal
+        visible={isVehicleModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsVehicleModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Selecionar veiculo</Text>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalList}>
+              {vehicles.map((resource) => {
+                const isActive = resource.id === selectedResourceId;
+                const resourceStatus = getResourceStatus(resource.id, selectedDate);
 
-function LegendItem({ color, label }: { color: string; label: string }) {
-  return (
-    <View style={styles.legendItem}>
-      <View style={[styles.legendDot, { backgroundColor: color }]} />
-      <Text style={styles.legendText}>{label}</Text>
-    </View>
+                return (
+                  <Pressable
+                    key={resource.id}
+                    style={[styles.modalItem, isActive && styles.modalItemActive]}
+                    onPress={() => {
+                      setSelectedResourceId(resource.id);
+                      setIsVehicleModalOpen(false);
+                    }}
+                  >
+                    <View style={styles.modalItemCopy}>
+                      <Text style={styles.modalItemTitle}>{resource.name}</Text>
+                      <Text style={styles.modalItemMeta}>
+                        {resource.plate ?? resource.code} | {resource.location}
+                      </Text>
+                      <Text style={styles.modalItemMeta}>
+                        {resource.rentalCompany ?? "-"} | Km {resource.currentMileage ?? "-"}
+                      </Text>
+                    </View>
+                    <StatusBadge status={resourceStatus} kind="resource" />
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            <Pressable style={styles.modalClose} onPress={() => setIsVehicleModalOpen(false)}>
+              <Text style={styles.modalCloseText}>Fechar</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   header: {
-    marginHorizontal: -spacing.lg,
-    marginTop: -spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: "#29631B",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    gap: spacing.xs,
   },
   headerTitle: {
-    color: colors.white,
-    fontSize: 22,
-    fontWeight: "800",
+    color: colors.text,
+    fontSize: typography.title,
+    fontWeight: "700",
   },
-  availablePill: {
-    backgroundColor: "#2D9340",
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  headerSubtitle: {
+    color: colors.textSecondary,
+    fontSize: typography.bodySmall,
+    lineHeight: 20,
   },
-  availablePillText: {
-    color: colors.white,
+  selectorBlock: {
+    gap: spacing.xs,
+  },
+  selectorLabel: {
+    color: colors.textSecondary,
     fontSize: typography.caption,
     fontWeight: "700",
   },
-  vehicleBanner: {
-    backgroundColor: "#EAF6E9",
-    borderRadius: 18,
-    padding: spacing.md,
-    gap: spacing.xs,
+  selector: {
+    minHeight: 52,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
-  vehicleRow: {
+  selectorText: {
+    flex: 1,
+    color: colors.text,
+    fontSize: typography.body,
+  },
+  resourceSummary: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.soft,
+  },
+  resourceSummaryTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
+  resourceTitleRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
+    flex: 1,
   },
-  vehicleTitle: {
-    color: "#3C3C3C",
-    fontSize: typography.body,
+  resourceTitle: {
+    color: colors.text,
+    fontSize: typography.cardTitle,
     fontWeight: "700",
+    flex: 1,
   },
-  vehicleMeta: {
-    color: "#4A4A4A",
-    fontSize: typography.body,
-  },
-  vehicleMetaStrong: {
-    color: "#333333",
-    fontSize: typography.body,
-    fontWeight: "700",
+  resourceMeta: {
+    color: colors.textSecondary,
+    fontSize: typography.bodySmall,
+    marginTop: spacing.xs,
   },
   monthHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: spacing.sm,
+    justifyContent: "space-between",
+  },
+  monthButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primarySoft,
   },
   monthTitle: {
-    color: "#202020",
-    fontSize: 22,
-    fontWeight: "800",
+    color: colors.text,
+    fontSize: typography.section,
+    fontWeight: "700",
   },
   calendarCard: {
     backgroundColor: colors.surface,
-    borderRadius: 24,
+    borderRadius: radius.xl,
     padding: spacing.md,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 14,
-    elevation: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
   },
   weekHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    marginBottom: spacing.sm,
   },
-  weekText: {
-    width: "14.2%",
+  weekLabel: {
+    flex: 1,
     textAlign: "center",
-    color: "#969696",
+    color: colors.textMuted,
     fontSize: typography.caption,
+    fontWeight: "600",
   },
   grid: {
+    gap: spacing.xs,
+  },
+  gridRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    marginTop: spacing.sm,
+    gap: spacing.xs,
   },
-  dayCell: {
-    width: "14.2%",
-    minHeight: 52,
-    alignItems: "center",
-    marginBottom: spacing.xs,
+  gridCell: {
+    flex: 1,
   },
-  dayNumber: {
-    color: "#4D4D4D",
-    fontSize: typography.body,
-    fontWeight: "700",
-  },
-  dayNumberMuted: {
-    color: "#BDBDBD",
-  },
-  dayDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 999,
-    marginTop: 4,
-  },
-  dayStateText: {
-    fontSize: 9,
-    fontWeight: "700",
-    marginTop: 2,
-    textAlign: "center",
-  },
-  legend: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+  dayCard: {
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    padding: spacing.md,
     gap: spacing.md,
   },
-  legendItem: {
+  dayCardHeader: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 999,
-  },
-  legendText: {
-    color: "#525252",
-    fontSize: typography.caption,
-  },
-  sectionTitle: {
-    color: "#242424",
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  monthReservations: {
+    alignItems: "flex-start",
+    justifyContent: "space-between",
     gap: spacing.sm,
   },
-  reservationBar: {
-    borderRadius: 12,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
+  dayCardCopy: {
+    flex: 1,
+    gap: spacing.xs,
   },
-  reservationBarText: {
-    color: colors.white,
-    fontSize: typography.body,
+  dayCardTitle: {
+    color: colors.text,
+    fontSize: typography.cardTitle,
     fontWeight: "700",
   },
-  primaryCta: {
-    backgroundColor: "#275E16",
-    borderRadius: 14,
-    minHeight: 52,
+  dayCardDescription: {
+    color: colors.textSecondary,
+    fontSize: typography.body,
+    lineHeight: 22,
+  },
+  availabilityPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+  },
+  availabilityPillText: {
+    color: colors.white,
+    fontSize: typography.caption,
+    fontWeight: "700",
+  },
+  dayActions: {
+    gap: spacing.sm,
+  },
+  primaryAction: {
+    minHeight: 48,
+    borderRadius: radius.md,
+    backgroundColor: colors.primaryDark,
     alignItems: "center",
     justifyContent: "center",
   },
-  primaryCtaText: {
+  primaryActionText: {
     color: colors.white,
     fontSize: typography.body,
-    fontWeight: "800",
+    fontWeight: "700",
+  },
+  secondaryAction: {
+    minHeight: 44,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.primaryDark,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+  },
+  secondaryActionText: {
+    color: colors.primaryDark,
+    fontSize: typography.body,
+    fontWeight: "700",
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  sectionTitle: {
+    color: colors.text,
+    fontSize: typography.cardTitle,
+    fontWeight: "700",
+  },
+  sectionSubtitle: {
+    color: colors.textMuted,
+    fontSize: typography.caption,
+  },
+  list: {
+    gap: spacing.sm,
+  },
+  reservationRow: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
+  reservationRowCopy: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  reservationRowTitle: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: "700",
+  },
+  reservationRowText: {
+    color: colors.textSecondary,
+    fontSize: typography.bodySmall,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: colors.overlay,
+  },
+  modalContent: {
+    maxHeight: "78%",
+    backgroundColor: colors.surface,
+    padding: spacing.lg,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    gap: spacing.md,
+  },
+  modalTitle: {
+    color: colors.text,
+    fontSize: typography.section,
+    fontWeight: "700",
+  },
+  modalList: {
+    gap: spacing.sm,
+  },
+  modalItem: {
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
+  modalItemActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  modalItemCopy: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  modalItemTitle: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: "700",
+  },
+  modalItemMeta: {
+    color: colors.textSecondary,
+    fontSize: typography.caption,
+  },
+  modalClose: {
+    minHeight: 48,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalCloseText: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: "700",
   },
 });

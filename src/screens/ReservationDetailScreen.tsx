@@ -1,41 +1,128 @@
-import { StyleSheet, Text, View } from "react-native";
-import { Card, Header, ScreenContainer, SecondaryButton, StatusBadge } from "@/components";
+import { router } from "expo-router";
+import { useState } from "react";
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Card,
+  EmptyState,
+  Header,
+  PrimaryButton,
+  ScreenContainer,
+  SecondaryButton,
+  SignatureField,
+  StatusBadge,
+} from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
-import { colors, spacing, typography } from "@/theme";
+import { colors, radius, spacing, typography } from "@/theme";
 import { formatDateTime } from "@/utils/date";
+import {
+  formatMileageValue,
+  getAllOperationPhotos,
+  getTravelDistance,
+  requiredPhotoSlots,
+} from "@/utils/operation";
+import type { ReservationInspection } from "@/types";
 
 interface ReservationDetailScreenProps {
   reservationId: string;
 }
 
 export function ReservationDetailScreen({ reservationId }: ReservationDetailScreenProps) {
-  const { reservations, resources } = useReservationStore();
+  const { reservations, resources, users, cancelReservation } = useReservationStore();
+  const [feedback, setFeedback] = useState<string | null>(null);
   const reservation = reservations.find((item) => item.id === reservationId);
+
+  const openOperation = (mode: "checkin" | "checkout") => {
+    router.push({
+      pathname: "/operation/[id]",
+      params: { id: reservationId, mode },
+    });
+  };
 
   if (!reservation) {
     return (
       <ScreenContainer>
-        <Text>Reserva não encontrada.</Text>
+        <EmptyState
+          icon="alert-circle"
+          title="Reserva não encontrada"
+          description="A reserva solicitada não está disponível."
+        />
       </ScreenContainer>
     );
   }
 
   const resource = resources.find((item) => item.id === reservation.resourceId);
+  const requester = users.find((item) => item.id === reservation.userId);
+
+  const handleCancelReservation = () => {
+    const result = cancelReservation(reservation.id);
+    setFeedback(result.message);
+  };
 
   return (
     <ScreenContainer
       header={
-        <Header eyebrow={reservation.code} title="Detalhe da reserva" subtitle="Resumo completo do ciclo operacional e histórico básico do item." />
+        <Header
+          eyebrow={reservation.code}
+          title="Detalhe da reserva"
+          subtitle="Resumo completo do ciclo operacional, vistoria e histórico do veículo."
+        />
       }
     >
       <Card>
         <StatusBadge status={reservation.status} kind="reservation" />
         <Info label="Recurso" value={resource?.name ?? "Recurso não encontrado"} />
-        <Info label="Período" value={`${formatDateTime(reservation.startDate)} até ${formatDateTime(reservation.endDate)}`} />
+        <Info
+          label="Período"
+          value={`${formatDateTime(reservation.startDate)} até ${formatDateTime(reservation.endDate)}`}
+        />
+        {reservation.plannedDurationHours ? (
+          <Info label="Duração planejada" value={`${reservation.plannedDurationHours} hora(s)`} />
+        ) : null}
         <Info label="Finalidade" value={reservation.purpose} />
         <Info label="Base" value={reservation.base} />
+        {requester ? (
+          <Info
+            label="Solicitante"
+            value={`${requester.fullName} | ${requester.matricula} | ${requester.areaDepartamento} | CNH ${requester.cnhStatus}`}
+          />
+        ) : null}
         <Info label="Observações" value={reservation.notes || "Sem observações registradas."} />
+        {reservation.checkInAt ? <Info label="Saída" value={formatDateTime(reservation.checkInAt)} /> : null}
+        {reservation.checkOutAt ? <Info label="Devolução" value={formatDateTime(reservation.checkOutAt)} /> : null}
       </Card>
+
+      {reservation.checkInData ? (
+        <InspectionCard
+          title="Vistoria de Saída"
+          inspection={reservation.checkInData}
+        />
+      ) : null}
+
+      {reservation.checkOutData ? (
+        <InspectionCard
+          title="Check-in de Devolução"
+          inspection={reservation.checkOutData}
+          distance={getTravelDistance(reservation.startMileage, reservation.endMileage)}
+        />
+      ) : null}
+
+      {reservation.status === "Aprovada" ? (
+        <PrimaryButton label="Abrir vistoria de saída" onPress={() => openOperation("checkin")} />
+      ) : null}
+
+      {reservation.status === "Em uso" ? (
+        <PrimaryButton label="Registrar devolução" onPress={() => openOperation("checkout")} />
+      ) : null}
+
+      {reservation.status === "Aprovada" || reservation.status === "Pendente" ? (
+        <SecondaryButton label="Cancelar reserva" onPress={handleCancelReservation} />
+      ) : null}
+
+      {feedback ? (
+        <View style={styles.feedback}>
+          <Text style={styles.feedbackText}>{feedback}</Text>
+        </View>
+      ) : null}
 
       <Card>
         <Text style={styles.sectionTitle}>Histórico</Text>
@@ -45,19 +132,91 @@ export function ReservationDetailScreen({ reservationId }: ReservationDetailScre
               <View style={styles.historyDot} />
               <View style={styles.historyCopy}>
                 <Text style={styles.historyLabel}>{item.label}</Text>
-                <Text style={styles.historyMeta}>{item.actor} • {formatDateTime(item.timestamp)}</Text>
+                <Text style={styles.historyMeta}>
+                  {item.actor} • {formatDateTime(item.timestamp)}
+                </Text>
                 {item.note ? <Text style={styles.historyNote}>{item.note}</Text> : null}
               </View>
             </View>
           ))}
         </View>
       </Card>
-
-      <View style={styles.actions}>
-        <SecondaryButton label="Cancelar reserva" onPress={() => {}} disabled />
-        <SecondaryButton label="Editar futuramente" onPress={() => {}} disabled />
-      </View>
     </ScreenContainer>
+  );
+}
+
+function InspectionCard({
+  title,
+  inspection,
+  distance,
+}: {
+  title: string;
+  inspection: ReservationInspection;
+  distance?: number | null;
+}) {
+  const photos = getAllOperationPhotos(
+    inspection.requiredPhotos,
+    inspection.additionalPhotos,
+    inspection.damagePhotos
+  );
+
+  return (
+    <Card>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <Info label="Data/Hora" value={formatDateTime(inspection.inspectedAt)} />
+      <Info label="Inspecionado por" value={inspection.inspectedBy} />
+      <Info label="Contraparte" value={inspection.counterpartyName} />
+      <Info label="Quilometragem" value={formatMileageValue(inspection.mileage)} />
+      {distance !== undefined ? (
+        <Info label="Distância percorrida" value={distance !== null ? `${distance} km` : "Não calculada"} />
+      ) : null}
+      <Info label="Combustível" value={inspection.fuelLevel} />
+      <Info
+        label="Avarias"
+        value={
+          inspection.damageIdentified
+            ? inspection.damageDescription || "Avaria identificada sem descrição."
+            : "Nenhuma avaria observada"
+        }
+      />
+      {inspection.notes ? <Info label="Observações" value={inspection.notes} /> : null}
+
+      <View style={styles.photoSection}>
+        <Text style={styles.photoSectionTitle}>Fotos da vistoria</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoStrip}>
+          {requiredPhotoSlots.map(({ key, label }) => (
+            <PhotoPreview
+              key={key}
+              label={label}
+              uri={inspection.requiredPhotos[key]?.uri}
+            />
+          ))}
+          {inspection.additionalPhotos.map((photo) => (
+            <PhotoPreview key={photo.id} label="Adicional" uri={photo.uri} />
+          ))}
+          {inspection.damagePhotos.map((photo) => (
+            <PhotoPreview key={photo.id} label="Avaria" uri={photo.uri} />
+          ))}
+        </ScrollView>
+        <Text style={styles.photoCountText}>{photos.length} foto(s) registradas</Text>
+      </View>
+
+      <SignatureField
+        value={inspection.signature}
+        signerName={inspection.signature.signerName}
+        onChange={() => undefined}
+        readonly
+      />
+    </Card>
+  );
+}
+
+function PhotoPreview({ label, uri }: { label: string; uri?: string }) {
+  return (
+    <View style={styles.photoPreview}>
+      {uri ? <Image source={{ uri }} style={styles.photoPreviewImage} /> : <View style={styles.photoPreviewEmpty} />}
+      <Text style={styles.photoPreviewLabel}>{label}</Text>
+    </View>
   );
 }
 
@@ -74,14 +233,14 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: colors.text,
     fontSize: typography.cardTitle,
-    fontWeight: "800",
+    fontWeight: "700",
   },
   infoRow: {
     marginTop: spacing.md,
     gap: spacing.xxs,
   },
   infoLabel: {
-    color: colors.textMuted,
+    color: colors.textSecondary,
     fontSize: typography.caption,
     fontWeight: "700",
   },
@@ -119,11 +278,57 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
   },
   historyNote: {
-    color: colors.text,
-    fontSize: typography.caption,
+    color: colors.textSecondary,
+    fontSize: typography.bodySmall,
     lineHeight: 20,
   },
-  actions: {
+  feedback: {
+    borderRadius: 12,
+    backgroundColor: colors.primarySoft,
+    padding: spacing.md,
+  },
+  feedbackText: {
+    color: colors.primaryDark,
+    fontSize: typography.bodySmall,
+    fontWeight: "700",
+  },
+  photoSection: {
+    marginTop: spacing.md,
     gap: spacing.sm,
+  },
+  photoSectionTitle: {
+    color: colors.primaryDark,
+    fontSize: typography.body,
+    fontWeight: "700",
+  },
+  photoStrip: {
+    gap: spacing.sm,
+    paddingRight: spacing.sm,
+  },
+  photoPreview: {
+    width: 112,
+    gap: spacing.xs,
+  },
+  photoPreviewImage: {
+    width: 112,
+    height: 84,
+    borderRadius: radius.lg,
+  },
+  photoPreviewEmpty: {
+    width: 112,
+    height: 84,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  photoPreviewLabel: {
+    color: colors.textSecondary,
+    fontSize: typography.caption,
+    textAlign: "center",
+  },
+  photoCountText: {
+    color: colors.textSecondary,
+    fontSize: typography.caption,
   },
 });

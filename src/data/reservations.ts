@@ -10,7 +10,8 @@ export const reservations: Reservation[] = [
     purpose: "Atendimento de operação e vistoria de fornecedores.",
     base: "Campinas",
     startDate: "2026-03-28T08:00:00.000Z",
-    endDate: "2026-03-29T18:00:00.000Z",
+    endDate: "2026-03-28T12:00:00.000Z",
+    plannedDurationHours: 4,
     status: "Em uso",
     notes: "Levar kit de checklist e documentos do veículo.",
     approver: "Marina Souto",
@@ -38,7 +39,8 @@ export const reservations: Reservation[] = [
     purpose: "Uso em reunião com equipe externa e apresentação executiva.",
     base: "São Paulo",
     startDate: "2026-03-29T09:00:00.000Z",
-    endDate: "2026-03-30T14:00:00.000Z",
+    endDate: "2026-03-29T13:00:00.000Z",
+    plannedDurationHours: 4,
     status: "Aprovada",
     approver: "Marina Souto",
     history: [
@@ -65,7 +67,8 @@ export const reservations: Reservation[] = [
     purpose: "Reunião de alinhamento com fornecedores estratégicos.",
     base: "Barueri",
     startDate: "2026-04-02T08:30:00.000Z",
-    endDate: "2026-04-02T18:00:00.000Z",
+    endDate: "2026-04-02T11:30:00.000Z",
+    plannedDurationHours: 3,
     status: "Pendente",
     history: [
       {
@@ -85,7 +88,8 @@ export const reservations: Reservation[] = [
     purpose: "Agenda com clientes e homologação de rota.",
     base: "Jundiaí",
     startDate: "2026-03-20T07:00:00.000Z",
-    endDate: "2026-03-20T19:00:00.000Z",
+    endDate: "2026-03-20T10:00:00.000Z",
+    plannedDurationHours: 3,
     status: "Concluida",
     notes: "Uso concluído sem ocorrências.",
     approver: "Marina Souto",
@@ -106,8 +110,9 @@ export const reservations: Reservation[] = [
     title: "Inspeção programada",
     purpose: "Inspeção em base remota com equipe de operação.",
     base: "Sorocaba",
-    startDate: "2026-04-04T08:00:00.000Z",
+    startDate: "2026-04-04T13:00:00.000Z",
     endDate: "2026-04-04T16:00:00.000Z",
+    plannedDurationHours: 3,
     status: "Aprovada",
     history: [
       {

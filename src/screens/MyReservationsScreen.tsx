@@ -1,140 +1,375 @@
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { ScreenContainer, StatusBadge } from "@/components";
+import { useMemo, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { EmptyState, ScreenContainer, StatusBadge } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
-import { colors, radius, spacing, typography } from "@/theme";
+import { colors, radius, shadows, spacing, typography } from "@/theme";
 import { formatDateTime } from "@/utils/date";
 import { getResourceById } from "@/utils/reservations";
+import type { ReservationStatus } from "@/types";
+
+type ReservationFilter = "Ativas" | "Em uso" | "Concluidas" | "Canceladas";
+
+const filterMap: Record<ReservationFilter, ReservationStatus[]> = {
+  Ativas: ["Pendente", "Aprovada"],
+  "Em uso": ["Em uso", "Em atraso"],
+  Concluidas: ["Concluida"],
+  Canceladas: ["Cancelada"],
+};
 
 export function MyReservationsScreen() {
-  const { currentUserId, reservations, resources } = useReservationStore();
-  const myReservations = reservations.filter((reservation) => reservation.userId === currentUserId);
+  const { currentUser, currentUserId, reservations, resources, cancelReservation } =
+    useReservationStore();
+  const [filter, setFilter] = useState<ReservationFilter>("Ativas");
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const myReservations = useMemo(
+    () =>
+      reservations
+        .filter((reservation) => reservation.userId === currentUserId)
+        .sort((left, right) => new Date(right.startDate).getTime() - new Date(left.startDate).getTime()),
+    [currentUserId, reservations]
+  );
+
+  const filteredReservations = useMemo(
+    () => myReservations.filter((reservation) => filterMap[filter].includes(reservation.status)),
+    [filter, myReservations]
+  );
+
+  const counts = {
+    Ativas: myReservations.filter((reservation) => filterMap.Ativas.includes(reservation.status)).length,
+    "Em uso": myReservations.filter((reservation) => filterMap["Em uso"].includes(reservation.status)).length,
+    Concluidas: myReservations.filter((reservation) => filterMap.Concluidas.includes(reservation.status)).length,
+    Canceladas: myReservations.filter((reservation) => filterMap.Canceladas.includes(reservation.status)).length,
+  };
+
+  const openOperation = (reservationId: string, mode: "checkin" | "checkout") => {
+    router.push({
+      pathname: "/operation/[id]",
+      params: { id: reservationId, mode },
+    });
+  };
+
+  const openDetail = (reservationId: string) => {
+    router.push({
+      pathname: "/reservation/[id]",
+      params: { id: reservationId },
+    });
+  };
+
+  const handleReservationAction = (reservationId: string, status: ReservationStatus) => {
+    if (status === "Aprovada") {
+      openOperation(reservationId, "checkin");
+      return;
+    }
+
+    if (status === "Em uso") {
+      openOperation(reservationId, "checkout");
+      return;
+    }
+
+    if (status === "Pendente") {
+      const result = cancelReservation(reservationId);
+      setFeedback(result.message);
+    }
+  };
 
   return (
     <ScreenContainer>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Minhas Reservas</Text>
-        <Pressable style={styles.newButton} onPress={() => router.push("/reservation/new")}>
-          <Feather name="plus" size={20} color={colors.white} />
-        </Pressable>
-      </View>
-
-      <View style={styles.heroCard}>
-        <Text style={styles.heroTitle}>Gerencie suas solicitações</Text>
-        <Text style={styles.heroSubtitle}>
-          Acompanhe pendências, períodos reservados e o andamento operacional de cada veículo.
+        <Text style={styles.headerSubtitle}>
+          Acompanhe o status e execute a proxima acao sem trocar de fluxo.
         </Text>
+        <Text style={styles.headerUser}>{currentUser.fullName}</Text>
       </View>
 
-      <View style={styles.list}>
-        {myReservations.map((reservation) => {
-          const resource = getResourceById(resources, reservation.resourceId);
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterTabs}>
+        {(["Ativas", "Em uso", "Concluidas", "Canceladas"] as ReservationFilter[]).map((item) => {
+          const active = item === filter;
 
           return (
-            <Pressable key={reservation.id} style={styles.reservationCard} onPress={() => router.push(`/reservation/${reservation.id}`)}>
-              <View style={styles.cardHeader}>
-                <View style={styles.cardTitleBlock}>
-                  <Text style={styles.cardTitle}>{resource?.name ?? reservation.title}</Text>
-                  <Text style={styles.cardCode}>{reservation.code}</Text>
-                </View>
-                <StatusBadge status={reservation.status} kind="reservation" />
+            <Pressable key={item} style={styles.filterTab} onPress={() => setFilter(item)}>
+              <View style={styles.filterLabelRow}>
+                <Text style={[styles.filterText, active && styles.filterTextActive]}>{item}</Text>
+                {counts[item] > 0 ? (
+                  <View style={[styles.countBadge, active && styles.countBadgeActive]}>
+                    <Text style={[styles.countBadgeText, active && styles.countBadgeTextActive]}>
+                      {counts[item]}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
-              <Text style={styles.cardLine}>Período: {formatDateTime(reservation.startDate)} até {formatDateTime(reservation.endDate)}</Text>
-              <Text style={styles.cardLine}>Finalidade: {reservation.purpose}</Text>
-              <Text style={styles.cardLine}>Base: {reservation.base}</Text>
-              <Text style={styles.cardAction}>Ver detalhes</Text>
+              {active ? <View style={styles.filterUnderline} /> : null}
             </Pressable>
           );
         })}
+      </ScrollView>
+
+      {feedback ? (
+        <View style={styles.feedback}>
+          <Text style={styles.feedbackText}>{feedback}</Text>
+        </View>
+      ) : null}
+
+      <View style={styles.list}>
+        {filteredReservations.length === 0 ? (
+          <EmptyState
+            icon="bookmark"
+            title="Nenhuma reserva neste filtro"
+            description="Selecione outro grupo ou inicie uma nova reserva pela agenda."
+          />
+        ) : (
+          filteredReservations.map((reservation) => {
+            const resource = getResourceById(resources, reservation.resourceId);
+            const actionLabel =
+              reservation.status === "Pendente"
+                ? "Cancelar reserva"
+                : reservation.status === "Aprovada"
+                  ? "Iniciar vistoria de saida"
+                  : reservation.status === "Em uso"
+                    ? "Registrar devolucao"
+                    : undefined;
+
+            return (
+              <View key={reservation.id} style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <View style={styles.cardHeaderCopy}>
+                    <Text style={styles.cardTitle}>{reservation.code}</Text>
+                    <Text style={styles.cardSubtitle}>
+                      {resource?.name ?? reservation.title}
+                      {resource?.plate ? ` | ${resource.plate}` : ""}
+                    </Text>
+                  </View>
+                  <StatusBadge status={reservation.status} kind="reservation" />
+                </View>
+
+                <InfoRow
+                  icon="calendar"
+                  text={`${formatDateTime(reservation.startDate)} -> ${formatDateTime(reservation.endDate)}`}
+                />
+                {reservation.plannedDurationHours ? (
+                  <InfoRow icon="clock" text={`Duracao planejada: ${reservation.plannedDurationHours}h`} />
+                ) : null}
+                <InfoRow icon="map-pin" text={reservation.base} />
+                <InfoRow icon="briefcase" text={reservation.purpose} />
+
+                <View style={styles.actionsRow}>
+                  <Pressable
+                    style={[styles.actionButton, styles.secondaryAction]}
+                    onPress={() => openDetail(reservation.id)}
+                  >
+                    <Text style={[styles.actionButtonText, styles.secondaryActionText]}>Ver detalhes</Text>
+                  </Pressable>
+
+                  {actionLabel ? (
+                    <Pressable
+                      style={[
+                        styles.actionButton,
+                        reservation.status === "Pendente" ? styles.dangerAction : styles.primaryAction,
+                      ]}
+                      onPress={() => handleReservationAction(reservation.id, reservation.status)}
+                    >
+                      <Text
+                        style={[
+                          styles.actionButtonText,
+                          reservation.status === "Pendente" && styles.dangerActionText,
+                        ]}
+                      >
+                        {actionLabel}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+            );
+          })
+        )}
       </View>
+
+      <Pressable style={styles.fab} onPress={() => router.push("/(tabs)/agenda")}>
+        <Feather name="calendar" size={22} color={colors.white} />
+      </Pressable>
     </ScreenContainer>
+  );
+}
+
+function InfoRow({ icon, text }: { icon: keyof typeof Feather.glyphMap; text: string }) {
+  return (
+    <View style={styles.infoRow}>
+      <Feather name={icon} size={18} color={colors.primaryDark} />
+      <Text style={styles.infoText}>{text}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   header: {
-    marginHorizontal: -spacing.lg,
-    marginTop: -spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: "#29631B",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  headerTitle: {
-    color: colors.white,
-    fontSize: 24,
-    fontWeight: "800",
-  },
-  newButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: "#2DA13B",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  heroCard: {
-    backgroundColor: "#F0F7EE",
-    borderRadius: 18,
-    padding: spacing.md,
     gap: spacing.xs,
   },
-  heroTitle: {
-    color: "#1F1F1F",
-    fontSize: typography.section,
-    fontWeight: "800",
+  headerTitle: {
+    color: colors.text,
+    fontSize: typography.title,
+    fontWeight: "700",
   },
-  heroSubtitle: {
-    color: "#5D5D5D",
+  headerSubtitle: {
+    color: colors.textSecondary,
+    fontSize: typography.bodySmall,
+    lineHeight: 20,
+  },
+  headerUser: {
+    color: colors.primaryDark,
+    fontSize: typography.caption,
+    fontWeight: "700",
+  },
+  filterTabs: {
+    gap: spacing.lg,
+    paddingRight: spacing.lg,
+  },
+  filterTab: {
+    paddingBottom: spacing.xs,
+  },
+  filterLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  filterText: {
+    color: colors.textMuted,
     fontSize: typography.body,
-    lineHeight: 22,
+    fontWeight: "600",
+  },
+  filterTextActive: {
+    color: colors.primaryDark,
+    fontWeight: "700",
+  },
+  countBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
+  countBadgeActive: {
+    backgroundColor: colors.primaryDark,
+  },
+  countBadgeText: {
+    color: colors.textSecondary,
+    fontSize: typography.tiny,
+    fontWeight: "700",
+  },
+  countBadgeTextActive: {
+    color: colors.white,
+  },
+  filterUnderline: {
+    marginTop: spacing.xs,
+    height: 3,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primaryDark,
+  },
+  feedback: {
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  feedbackText: {
+    color: colors.primaryDark,
+    fontSize: typography.bodySmall,
+    fontWeight: "700",
   },
   list: {
     gap: spacing.md,
+    paddingBottom: 96,
   },
-  reservationCard: {
+  card: {
     backgroundColor: colors.surface,
-    borderRadius: 22,
+    borderRadius: radius.xl,
     padding: spacing.md,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
+    ...shadows.card,
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: spacing.sm,
     alignItems: "flex-start",
+    gap: spacing.sm,
   },
-  cardTitleBlock: {
+  cardHeaderCopy: {
     flex: 1,
-    gap: 2,
+    gap: spacing.xxs,
   },
   cardTitle: {
-    color: "#242424",
+    color: colors.primaryDark,
     fontSize: typography.cardTitle,
-    fontWeight: "800",
-  },
-  cardCode: {
-    color: "#2C6A20",
-    fontSize: typography.caption,
     fontWeight: "700",
   },
-  cardLine: {
-    color: "#595959",
-    fontSize: typography.body,
-    marginTop: spacing.sm,
+  cardSubtitle: {
+    color: colors.textSecondary,
+    fontSize: typography.bodySmall,
   },
-  cardAction: {
-    marginTop: spacing.md,
-    textAlign: "right",
-    color: "#2C6A20",
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  infoText: {
+    color: colors.text,
     fontSize: typography.body,
+    flex: 1,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  actionButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
+  },
+  primaryAction: {
+    backgroundColor: colors.primaryDark,
+  },
+  secondaryAction: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  dangerAction: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: `${colors.danger}33`,
+  },
+  actionButtonText: {
+    color: colors.white,
+    fontSize: typography.bodySmall,
     fontWeight: "700",
+    textAlign: "center",
+  },
+  secondaryActionText: {
+    color: colors.textSecondary,
+  },
+  dangerActionText: {
+    color: colors.danger,
+  },
+  fab: {
+    position: "absolute",
+    right: spacing.lg,
+    bottom: spacing.xl,
+    width: 56,
+    height: 56,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primaryDark,
+    alignItems: "center",
+    justifyContent: "center",
+    ...shadows.card,
   },
 });

@@ -9,7 +9,7 @@ interface ScreenContainerProps extends PropsWithChildren {
 
 export function ScreenContainer({ children, scroll = true, header }: ScreenContainerProps) {
   const content = (
-    <View style={styles.inner}>
+    <View style={[styles.inner, !scroll && styles.innerFill]}>
       {header}
       {children}
     </View>
@@ -32,5 +32,8 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.xxl,
     gap: spacing.lg,
+  },
+  innerFill: {
+    flex: 1,
   },
 });
