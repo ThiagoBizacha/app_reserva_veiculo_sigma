@@ -1,7 +1,7 @@
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { ScreenContainer, StatusBadge } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
@@ -17,6 +17,7 @@ interface NewReservationScreenProps {
 type PickerField = "date" | "time" | null;
 
 const durationOptions = [1, 2, 3, 4] as const;
+const FIXED_BASE = "Araçuaí - MG";
 
 export function NewReservationScreen({
   initialDate,
@@ -40,7 +41,7 @@ export function NewReservationScreen({
 
   const [resourceId, setResourceId] = useState(initialResourceId ?? "");
   const [purpose, setPurpose] = useState("");
-  const [base, setBase] = useState("");
+  const [base] = useState(FIXED_BASE);
   const [notes, setNotes] = useState("");
   const [reservationDate, setReservationDate] = useState(defaultDay);
   const [pickupTime, setPickupTime] = useState(defaultTime);
@@ -68,12 +69,6 @@ export function NewReservationScreen({
     ? getResourceStatus(selectedResource.id, new Date(startDate))
     : "Disponivel";
   const isSubmitDisabled = !resourceId || !purpose.trim() || !base.trim() || conflicts.length > 0;
-
-  useEffect(() => {
-    if (selectedResource && !base.trim()) {
-      setBase(selectedResource.location);
-    }
-  }, [base, selectedResource]);
 
   const onChangeDate =
     (field: PickerField) => (event: DateTimePickerEvent, selected?: Date) => {
@@ -217,8 +212,9 @@ export function NewReservationScreen({
         <Field
           label="Local / Base"
           value={base}
-          onChangeText={setBase}
-          placeholder={"Ex.: Ara\u00E7ua\u00ED - MG"}
+          onChangeText={() => undefined}
+          placeholder={"Ara\u00E7ua\u00ED - MG"}
+          editable={false}
         />
         <Field
           label="Observacoes"
@@ -295,7 +291,6 @@ export function NewReservationScreen({
                     style={[styles.modalItem, resource.id === resourceId && styles.modalItemActive]}
                     onPress={() => {
                       setResourceId(resource.id);
-                      setBase(resource.location);
                       setShowResourceModal(false);
                     }}
                   >
@@ -349,12 +344,14 @@ function Field({
   onChangeText,
   placeholder,
   multiline,
+  editable = true,
 }: {
   label: string;
   value: string;
   onChangeText: (value: string) => void;
   placeholder: string;
   multiline?: boolean;
+  editable?: boolean;
 }) {
   return (
     <View style={styles.fieldWrap}>
@@ -362,10 +359,11 @@ function Field({
       <TextInput
         value={value}
         onChangeText={onChangeText}
+        editable={editable}
         placeholder={placeholder}
         placeholderTextColor={colors.textMuted}
         multiline={multiline}
-        style={[styles.textInput, multiline && styles.textInputMultiline]}
+        style={[styles.textInput, multiline && styles.textInputMultiline, !editable && styles.textInputDisabled]}
       />
     </View>
   );
@@ -531,6 +529,10 @@ const styles = StyleSheet.create({
     minHeight: 104,
     paddingTop: spacing.sm,
     textAlignVertical: "top",
+  },
+  textInputDisabled: {
+    backgroundColor: colors.surfaceAlt,
+    color: colors.textSecondary,
   },
   freeState: {
     minHeight: 56,
