@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Sigma Reserva",
+    "slug": "app-reserva-veiculo-sigma",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "platforms": [
+      "android",
+      "web"
+    ],
+    "android": {
+      "package": "com.sigma.reserva",
+      "adaptiveIcon": {
+        "backgroundColor": "#0E5F47"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-asset",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
