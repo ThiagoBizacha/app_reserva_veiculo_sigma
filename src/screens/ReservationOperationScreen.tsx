@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import {
   EmptyState,
+  ExitHeaderButton,
   OperationStepper,
   PhotoSlotCard,
   SignatureField,
@@ -26,7 +27,6 @@ import {
   fuelLevelOptions,
   getRequiredPhotoCount,
   getTravelDistance,
-  hasAllRequiredPhotos,
   hasSignature,
   parseMileageValue,
   requiredPhotoSlots,
@@ -204,10 +204,6 @@ export function ReservationOperationScreen({
       }
 
       return null;
-    }
-
-    if (activeStep === "photos" && !hasAllRequiredPhotos(requiredPhotos)) {
-      return `${4 - requiredPhotoCount} foto(s) obrigatória(s) pendente(s). Complete para continuar.`;
     }
 
     if (activeStep === "confirm") {
@@ -566,10 +562,7 @@ export function ReservationOperationScreen({
   const renderPhotosContent = () => (
     <>
       <View style={styles.photosIntro}>
-        <Text style={styles.photosIntroText}>
-          Fotografe o veículo em 4 ângulos obrigatórios antes de{" "}
-          {resolvedMode === "checkin" ? "liberar a saída" : "encerrar a reserva"}.
-        </Text>
+        <Text style={styles.photosIntroText}>Fotos do veículo são opcionais nesta demo.</Text>
       </View>
 
       <View style={styles.photoGrid}>
@@ -578,7 +571,7 @@ export function ReservationOperationScreen({
             key={key}
             label={label}
             photoUri={requiredPhotos[key]?.uri}
-            required
+            helperText="Opcional"
             onPress={() => openPhotoTarget({ kind: "required", slot: key })}
           />
         ))}
@@ -612,7 +605,7 @@ export function ReservationOperationScreen({
             label={resolvedMode === "checkin" ? "Entregue por" : "Recebido por"}
             value={counterpartyName || "-"}
           />
-          <SummaryRow label="Fotos obrigatórias" value={`${requiredPhotoCount}/4`} />
+          <SummaryRow label="Fotos registradas" value={`${requiredPhotoCount}/4`} />
           <SummaryRow
             label="Avarias"
             value={damageIdentified ? "Identificada" : "Nenhuma ocorrência"}
@@ -681,7 +674,10 @@ export function ReservationOperationScreen({
           <Feather name="arrow-left" size={24} color={colors.white} />
         </Pressable>
         <Text style={styles.headerTitle}>{title}</Text>
-        <Text style={styles.headerCode}>{reservation.code}</Text>
+        <View style={styles.headerMeta}>
+          <ExitHeaderButton variant="light" compact />
+          <Text style={styles.headerCode}>{reservation.code}</Text>
+        </View>
       </View>
 
       <View style={styles.stepperContainer}>
@@ -853,6 +849,12 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.title,
     fontWeight: "700",
+    flex: 1,
+    textAlign: "center",
+  },
+  headerMeta: {
+    alignItems: "flex-end",
+    gap: spacing.xs,
   },
   headerCode: {
     color: colors.white,

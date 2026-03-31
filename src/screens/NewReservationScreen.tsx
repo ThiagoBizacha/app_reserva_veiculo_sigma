@@ -3,7 +3,7 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo, useState, type ReactNode } from "react";
 import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { ScreenContainer, StatusBadge } from "@/components";
+import { ExitHeaderButton, ScreenContainer, StatusBadge } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import { addHours, formatDate, formatDateTime } from "@/utils/date";
@@ -123,7 +123,7 @@ export function NewReservationScreen({
           <Feather name="arrow-left" size={24} color={colors.white} />
         </Pressable>
         <Text style={styles.headerTitle}>Reserva de Veiculo</Text>
-        <View style={styles.headerSpacer} />
+        <ExitHeaderButton variant="light" compact />
       </View>
 
       <View style={styles.heroCard}>
@@ -384,6 +384,8 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.section,
     fontWeight: "700",
+    flex: 1,
+    textAlign: "center",
   },
   headerSpacer: {
     width: 24,

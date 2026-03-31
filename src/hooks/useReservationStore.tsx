@@ -34,7 +34,6 @@ import {
 } from "@/utils/reservations";
 import { getDurationHours, isSameCalendarDay } from "@/utils/date";
 import {
-  hasAllRequiredPhotos,
   hasSignature,
   parseMileageValue,
 } from "@/utils/operation";
@@ -384,10 +383,6 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       return mode === "checkin"
         ? "Informe quem entregou o veículo."
         : "Informe quem recebeu o veículo.";
-    }
-
-    if (!hasAllRequiredPhotos(payload.requiredPhotos)) {
-      return "Complete as 4 fotos obrigatórias da vistoria.";
     }
 
     if (!payload.confirmationChecked) {

@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { EmptyState, ScreenContainer, StatusBadge } from "@/components";
+import { EmptyState, ExitHeaderButton, ScreenContainer, StatusBadge } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import {
@@ -115,10 +115,15 @@ export function AgendaScreen({ initialResourceId }: AgendaScreenProps) {
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Agenda</Text>
-        <Text style={styles.headerSubtitle}>
-          Escolha o veiculo, toque no dia e tome a proxima acao sem sair do contexto.
-        </Text>
+        <View style={styles.headerTopRow}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.headerTitle}>Agenda</Text>
+            <Text style={styles.headerSubtitle}>
+              Escolha o veiculo, toque no dia e tome a proxima acao sem sair do contexto.
+            </Text>
+          </View>
+          <ExitHeaderButton />
+        </View>
       </View>
 
       <View style={styles.selectorBlock}>
@@ -316,6 +321,16 @@ export function AgendaScreen({ initialResourceId }: AgendaScreenProps) {
 
 const styles = StyleSheet.create({
   header: {
+    gap: spacing.xs,
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  headerCopy: {
+    flex: 1,
     gap: spacing.xs,
   },
   headerTitle: {

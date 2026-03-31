@@ -2,15 +2,18 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { ScreenContainer } from "@/components";
+import { ExitHeaderButton, ScreenContainer } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import { formatDate, isWithinRange } from "@/utils/date";
+import { RESERVATION_ACTIVE_STATUSES } from "@/utils/reservations";
+import type { Resource } from "@/types";
 
 export function AdminScreen() {
   const { currentUser, resources, reservations, getSummary } = useReservationStore();
   const summary = getSummary();
   const today = new Date();
+  const vehicles = resources.filter((resource) => resource.category === "Veiculo");
 
   const todayReservations = reservations
     .filter(
@@ -20,15 +23,70 @@ export function AdminScreen() {
     )
     .slice(0, 3);
   const pendingReservations = reservations.filter((reservation) => reservation.status === "Pendente");
-  const maintenanceVehicles = resources
-    .filter((resource) => resource.category === "Veiculo" && resource.status === "Manutencao")
+  const maintenanceVehicles = vehicles
+    .filter((resource) => resource.status === "Manutencao")
     .slice(0, 2);
+  const activeReservations = reservations.filter((reservation) =>
+    RESERVATION_ACTIVE_STATUSES.includes(reservation.status)
+  );
+  const lateReservations = reservations.filter((reservation) => reservation.status === "Em atraso");
+  const documentsAvailable = vehicles.filter((resource) => Boolean(resource.vehicleDocumentAttachment)).length;
+  const upcomingMaintenance = vehicles.filter((resource) =>
+    isDateWithinDays(resource.nextMaintenanceDate, 30)
+  ).length;
+  const averageMileage = getAverageMileage(vehicles);
 
   const totalPercent = Math.max(summary.total, 1);
   const availablePercent = Math.round((summary.available / totalPercent) * 100);
   const reservedPercent = Math.round((summary.reserved / totalPercent) * 100);
   const inUsePercent = Math.round((summary.inUse / totalPercent) * 100);
   const maintenancePercent = Math.round((summary.maintenance / totalPercent) * 100);
+  const occupancyRate = Math.round(((summary.reserved + summary.inUse) / totalPercent) * 100);
+
+  const indicators: IndicatorCardProps[] = [
+    {
+      icon: "activity",
+      value: `${occupancyRate}%`,
+      label: "Ocupacao",
+      helper: `${summary.reserved + summary.inUse} veiculos indisponiveis`,
+      accentColor: colors.info,
+    },
+    {
+      icon: "bookmark",
+      value: String(activeReservations.length),
+      label: "Reservas ativas",
+      helper: "Aprovadas, em uso e em atraso",
+      accentColor: colors.primaryDark,
+    },
+    {
+      icon: "alert-triangle",
+      value: String(lateReservations.length),
+      label: "Em atraso",
+      helper: "Demandam acao da operacao",
+      accentColor: colors.danger,
+    },
+    {
+      icon: "file-text",
+      value: `${documentsAvailable}/${vehicles.length}`,
+      label: "PDFs",
+      helper: "Documentos cadastrados",
+      accentColor: colors.success,
+    },
+    {
+      icon: "tool",
+      value: String(upcomingMaintenance),
+      label: "Revisao 30d",
+      helper: "Manutencoes proximas",
+      accentColor: colors.warning,
+    },
+    {
+      icon: "bar-chart-2",
+      value: averageMileage,
+      label: "Km medio",
+      helper: "Media da frota ativa",
+      accentColor: colors.primary,
+    },
+  ];
 
   return (
     <ScreenContainer>
@@ -37,50 +95,49 @@ export function AdminScreen() {
           <Feather name="arrow-left" size={24} color={colors.white} />
         </Pressable>
         <Text style={styles.headerTitle}>Painel da Frota</Text>
-        <Text style={styles.headerUser}>{currentUser.fullName}</Text>
+        <View style={styles.headerMeta}>
+          <ExitHeaderButton variant="light" compact />
+          <Text style={styles.headerUser}>{currentUser.fullName}</Text>
+        </View>
       </View>
 
       <View style={styles.metricsRow}>
-        <MetricCard value={summary.available} label="Disponíveis" color={colors.primaryDark} />
+        <MetricCard value={summary.available} label="Disponiveis" color={colors.primaryDark} />
         <MetricCard value={summary.inUse} label="Em Uso" color={colors.warning} />
-        <MetricCard value={summary.maintenance} label="Manutenção" color={colors.danger} />
+        <MetricCard value={summary.maintenance} label="Manutencao" color={colors.danger} />
       </View>
+
+      <PanelCard title="Indicadores Operacionais">
+        <View style={styles.indicatorGrid}>
+          {indicators.map((indicator) => (
+            <IndicatorCard key={indicator.label} {...indicator} />
+          ))}
+        </View>
+      </PanelCard>
 
       <PanelCard title="Disponibilidade da Frota">
         <View style={styles.progressBar}>
           <View
-            style={[
-              styles.progressSegment,
-              { width: `${availablePercent}%`, backgroundColor: colors.success },
-            ]}
+            style={[styles.progressSegment, { width: `${availablePercent}%`, backgroundColor: colors.success }]}
           />
           <View
-            style={[
-              styles.progressSegment,
-              { width: `${reservedPercent}%`, backgroundColor: colors.info },
-            ]}
+            style={[styles.progressSegment, { width: `${reservedPercent}%`, backgroundColor: colors.info }]}
           />
           <View
-            style={[
-              styles.progressSegment,
-              { width: `${inUsePercent}%`, backgroundColor: colors.warning },
-            ]}
+            style={[styles.progressSegment, { width: `${inUsePercent}%`, backgroundColor: colors.warning }]}
           />
           <View
-            style={[
-              styles.progressSegment,
-              { width: `${maintenancePercent}%`, backgroundColor: colors.danger },
-            ]}
+            style={[styles.progressSegment, { width: `${maintenancePercent}%`, backgroundColor: colors.danger }]}
           />
         </View>
         <View style={styles.legendRow}>
-          <Legend color={colors.success} label={`Disponível ${availablePercent}%`} />
+          <Legend color={colors.success} label={`Disponivel ${availablePercent}%`} />
           <Legend color={colors.info} label={`Reservado ${reservedPercent}%`} />
           <Legend color={colors.warning} label={`Em uso ${inUsePercent}%`} />
-          <Legend color={colors.danger} label={`Manutenção ${maintenancePercent}%`} />
+          <Legend color={colors.danger} label={`Manutencao ${maintenancePercent}%`} />
         </View>
         <Text style={styles.footerText}>
-          {summary.total} veículos no total | {summary.reserved} reservado(s) no período atual
+          {summary.total} veiculos no total | {summary.reserved} reservado(s) no periodo atual
         </Text>
       </PanelCard>
 
@@ -117,18 +174,18 @@ export function AdminScreen() {
         )}
       </PanelCard>
 
-      <PanelCard title="Solicitações Pendentes de Aprovação">
+      <PanelCard title="Solicitacoes Pendentes de Aprovacao">
         <View style={styles.alertBox}>
           <Feather name="bell" size={16} color={colors.white} />
           <Text style={styles.alertText}>
-            {pendingReservations.length} reservas aguardando aprovação do gestor
+            {pendingReservations.length} reservas aguardando aprovacao do gestor
           </Text>
         </View>
       </PanelCard>
 
-      <PanelCard title="Próximas Manutenções">
+      <PanelCard title="Proximas Manutencoes">
         {maintenanceVehicles.length === 0 ? (
-          <Text style={styles.emptyText}>Nenhuma manutenção programada.</Text>
+          <Text style={styles.emptyText}>Nenhuma manutencao programada.</Text>
         ) : (
           maintenanceVehicles.map((vehicle, index) => (
             <View
@@ -159,6 +216,27 @@ function MetricCard({ value, label, color }: { value: number; label: string; col
   );
 }
 
+interface IndicatorCardProps {
+  icon: keyof typeof Feather.glyphMap;
+  value: string;
+  label: string;
+  helper: string;
+  accentColor: string;
+}
+
+function IndicatorCard({ icon, value, label, helper, accentColor }: IndicatorCardProps) {
+  return (
+    <View style={styles.indicatorCard}>
+      <View style={[styles.indicatorIconWrap, { backgroundColor: `${accentColor}14` }]}>
+        <Feather name={icon} size={18} color={accentColor} />
+      </View>
+      <Text style={styles.indicatorValue}>{value}</Text>
+      <Text style={styles.indicatorLabel}>{label}</Text>
+      <Text style={styles.indicatorHelper}>{helper}</Text>
+    </View>
+  );
+}
+
 function PanelCard({ title, children }: { title: string; children: ReactNode }) {
   return (
     <View style={styles.panelCard}>
@@ -177,6 +255,43 @@ function Legend({ color, label }: { color: string; label: string }) {
   );
 }
 
+function parseMileage(value?: string) {
+  if (!value) {
+    return null;
+  }
+
+  const digits = value.replace(/\D/g, "");
+  return digits ? Number(digits) : null;
+}
+
+function getAverageMileage(resources: Resource[]) {
+  const parsed = resources
+    .map((resource) => parseMileage(resource.currentMileage))
+    .filter((value): value is number => value !== null);
+
+  if (parsed.length === 0) {
+    return "-";
+  }
+
+  return new Intl.NumberFormat("pt-BR").format(
+    Math.round(parsed.reduce((total, value) => total + value, 0) / parsed.length)
+  );
+}
+
+function isDateWithinDays(value: string | undefined, days: number) {
+  if (!value) {
+    return false;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(value);
+  target.setHours(0, 0, 0, 0);
+
+  const diffInDays = (target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+  return diffInDays >= 0 && diffInDays <= days;
+}
+
 const styles = StyleSheet.create({
   header: {
     marginHorizontal: -spacing.lg,
@@ -188,10 +303,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  headerMeta: {
+    alignItems: "flex-end",
+    gap: spacing.xs,
+  },
   headerTitle: {
     color: colors.white,
     fontSize: typography.section,
     fontWeight: "700",
+    flex: 1,
+    textAlign: "center",
   },
   headerUser: {
     color: colors.primarySoft,
@@ -234,6 +355,43 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: typography.section,
     fontWeight: "700",
+  },
+  indicatorGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  indicatorCard: {
+    width: "48%",
+    minHeight: 132,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  indicatorIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  indicatorValue: {
+    color: colors.text,
+    fontSize: typography.section,
+    fontWeight: "800",
+  },
+  indicatorLabel: {
+    color: colors.primaryDark,
+    fontSize: typography.bodySmall,
+    fontWeight: "700",
+  },
+  indicatorHelper: {
+    color: colors.textSecondary,
+    fontSize: typography.caption,
+    lineHeight: 18,
   },
   progressBar: {
     height: 24,

@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { EmptyState, ScreenContainer, StatusBadge } from "@/components";
+import { EmptyState, ExitHeaderButton, ScreenContainer, StatusBadge } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import { formatDateTime } from "@/utils/date";
@@ -78,11 +78,16 @@ export function MyReservationsScreen() {
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Minhas Reservas</Text>
-        <Text style={styles.headerSubtitle}>
-          Acompanhe o status e execute a proxima acao sem trocar de fluxo.
-        </Text>
-        <Text style={styles.headerUser}>{currentUser.fullName}</Text>
+        <View style={styles.headerTopRow}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.headerTitle}>Minhas Reservas</Text>
+            <Text style={styles.headerSubtitle}>
+              Acompanhe o status e execute a proxima acao sem trocar de fluxo.
+            </Text>
+            <Text style={styles.headerUser}>{currentUser.fullName}</Text>
+          </View>
+          <ExitHeaderButton />
+        </View>
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterTabs}>
@@ -206,6 +211,16 @@ function InfoRow({ icon, text }: { icon: keyof typeof Feather.glyphMap; text: st
 
 const styles = StyleSheet.create({
   header: {
+    gap: spacing.xs,
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  headerCopy: {
+    flex: 1,
     gap: spacing.xs,
   },
   headerTitle: {

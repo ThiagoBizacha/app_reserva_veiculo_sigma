@@ -1,6 +1,8 @@
 export * from "./Card";
 export * from "./CalendarDayCell";
+export * from "./DriverLicensePreviewModal";
 export * from "./EmptyState";
+export * from "./ExitHeaderButton";
 export * from "./FieldSelect";
 export * from "./FilterBar";
 export * from "./FormField";
@@ -17,3 +19,4 @@ export * from "./StatusBadge";
 export * from "./OperationStepper";
 export * from "./PhotoSlotCard";
 export * from "./SignatureField";
+export * from "./VehicleDocumentPreviewModal";

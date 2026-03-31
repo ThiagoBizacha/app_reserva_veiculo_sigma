@@ -33,6 +33,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="home" options={{ title: "Home" }} />
       <Tabs.Screen name="agenda" options={{ title: "Agenda" }} />
       <Tabs.Screen name="reservations" options={{ title: "Reservas" }} />
+      <Tabs.Screen name="reservation" options={{ href: null }} />
       <Tabs.Screen name="resources" options={{ title: "Frota" }} />
       <Tabs.Screen name="check-flow" options={{ href: null }} />
       <Tabs.Screen name="admin" options={{ href: null }} />

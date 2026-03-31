@@ -2,12 +2,12 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { ScreenContainer } from "@/components";
+import { ExitHeaderButton, ScreenContainer, VehicleDocumentPreviewModal } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import { formatDate, isWithinRange } from "@/utils/date";
 import { getNextReservation } from "@/utils/reservations";
-import type { ResourceStatus } from "@/types";
+import type { Resource, ResourceStatus } from "@/types";
 
 type FleetFilter = "Todos" | "Disponivel" | "Reservado" | "Em uso" | "Manutencao";
 
@@ -30,6 +30,7 @@ export function ResourcesScreen() {
   const { resources, reservations, getResourceStatus } = useReservationStore();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FleetFilter>("Todos");
+  const [documentResource, setDocumentResource] = useState<Resource | null>(null);
 
   const vehicles = resources.filter((item) => item.category === "Veiculo");
   const vehicleItems = useMemo(
@@ -37,12 +38,18 @@ export function ResourcesScreen() {
       vehicles.map((resource) => {
         const computedStatus = getResourceStatus(resource.id);
         const nextReservation = getNextReservation(resource, reservations);
-        const currentReservation = reservations.find(
-          (reservation) =>
-            reservation.resourceId === resource.id &&
-            ["Pendente", "Aprovada", "Em uso", "Em atraso"].includes(reservation.status) &&
-            isWithinRange(new Date(), reservation.startDate, reservation.endDate)
-        );
+        const currentReservation =
+          reservations.find(
+            (reservation) =>
+              reservation.resourceId === resource.id &&
+              (reservation.status === "Em uso" || reservation.status === "Em atraso")
+          ) ??
+          reservations.find(
+            (reservation) =>
+              reservation.resourceId === resource.id &&
+              ["Pendente", "Aprovada"].includes(reservation.status) &&
+              isWithinRange(new Date(), reservation.startDate, reservation.endDate)
+          );
 
         return {
           resource,
@@ -90,16 +97,23 @@ export function ResourcesScreen() {
     router.push({ pathname: "/resource/[id]", params: { id: resourceId } });
   };
 
+  const openDocumentPreview = (resource: Resource) => {
+    setDocumentResource(resource);
+  };
+
   return (
     <ScreenContainer>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Frota de Veículos</Text>
-        <Pressable
-          style={styles.plusButton}
-          onPress={() => router.push({ pathname: "/reservation/new" })}
-        >
-          <Feather name="plus" size={22} color={colors.white} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <ExitHeaderButton variant="light" compact />
+          <Pressable
+            style={styles.plusButton}
+            onPress={() => router.push({ pathname: "/reservation/new" })}
+          >
+            <Feather name="plus" size={22} color={colors.white} />
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.searchBar}>
@@ -203,22 +217,57 @@ export function ResourcesScreen() {
               <Text style={styles.metaText}>Responsável: {resource.responsible}</Text>
             </View>
 
-            <View style={styles.actionsRow}>
-              <Pressable style={[styles.actionButton, styles.secondaryAction]} onPress={() => openDetail(resource.id)}>
+            <View style={styles.utilityActionsRow}>
+              <Pressable
+                style={[styles.actionButton, styles.secondaryAction]}
+                onPress={() => openDetail(resource.id)}
+              >
                 <Text style={[styles.actionButtonText, styles.secondaryActionText]}>Ver detalhes</Text>
               </Pressable>
               <Pressable
-                style={[styles.actionButton, { backgroundColor: statusMeta[computedStatus].color }]}
-                onPress={() =>
-                  handleAction(computedStatus, resource.id, currentReservation?.id ?? nextReservation?.id)
-                }
+                style={[
+                  styles.actionButton,
+                  styles.secondaryAction,
+                  !resource.vehicleDocumentAttachment && styles.disabledAction,
+                ]}
+                onPress={() => openDocumentPreview(resource)}
+                disabled={!resource.vehicleDocumentAttachment}
               >
-                <Text style={styles.actionButtonText}>{statusMeta[computedStatus].action}</Text>
+                <View style={styles.inlineActionContent}>
+                  <Feather
+                    name="file-text"
+                    size={16}
+                    color={resource.vehicleDocumentAttachment ? colors.textSecondary : colors.textMuted}
+                  />
+                  <Text
+                    style={[
+                      styles.actionButtonText,
+                      styles.secondaryActionText,
+                      !resource.vehicleDocumentAttachment && styles.disabledActionText,
+                    ]}
+                  >
+                    Ver PDF
+                  </Text>
+                </View>
               </Pressable>
             </View>
+
+            <Pressable
+              style={[styles.actionButton, styles.primaryActionButton, { backgroundColor: statusMeta[computedStatus].color }]}
+              onPress={() =>
+                handleAction(computedStatus, resource.id, currentReservation?.id ?? nextReservation?.id)
+              }
+            >
+              <Text style={styles.actionButtonText}>{statusMeta[computedStatus].action}</Text>
+            </Pressable>
           </View>
         ))}
       </View>
+
+      <VehicleDocumentPreviewModal
+        resource={documentResource}
+        onClose={() => setDocumentResource(null)}
+      />
     </ScreenContainer>
   );
 }
@@ -240,6 +289,11 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.title,
     fontWeight: "700",
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
   },
   plusButton: {
     width: 40,
@@ -342,7 +396,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: typography.bodySmall,
   },
-  actionsRow: {
+  utilityActionsRow: {
     flexDirection: "row",
     gap: spacing.sm,
   },
@@ -359,6 +413,11 @@ const styles = StyleSheet.create({
     fontSize: typography.bodySmall,
     fontWeight: "700",
   },
+  inlineActionContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
   secondaryAction: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -366,5 +425,14 @@ const styles = StyleSheet.create({
   },
   secondaryActionText: {
     color: colors.textSecondary,
+  },
+  disabledAction: {
+    backgroundColor: colors.surfaceAlt,
+  },
+  disabledActionText: {
+    color: colors.textMuted,
+  },
+  primaryActionButton: {
+    minHeight: 48,
   },
 });

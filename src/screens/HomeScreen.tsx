@@ -1,14 +1,18 @@
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { ScreenContainer } from "@/components";
+import { DriverLicensePreviewModal, ExitHeaderButton, ScreenContainer } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
+import { formatDateTime } from "@/utils/date";
+import type { User } from "@/types";
 
 export function HomeScreen() {
   const { currentUser, currentUserName, reservations, users, getActionableReservations, getSummary } =
     useReservationStore();
+  const [licenseUser, setLicenseUser] = useState<User | null>(null);
   const summary = getSummary();
   const actionableReservations = getActionableReservations();
   const myOpenReservations = reservations.filter(
@@ -47,12 +51,15 @@ export function HomeScreen() {
       <LinearGradient colors={[colors.primaryDark, colors.green700]} style={styles.header}>
         <View style={styles.topRow}>
           <Text style={styles.brand}>SIGMA LITHIUM</Text>
-          <View style={styles.userInfo}>
-            <Text style={styles.userName}>{currentUserName}</Text>
-            <View style={styles.statusRow}>
-              <View style={styles.onlineDot} />
-              <Text style={styles.onlineText}>Online</Text>
+          <View style={styles.userActions}>
+            <View style={styles.userInfo}>
+              <Text style={styles.userName}>{currentUserName}</Text>
+              <View style={styles.statusRow}>
+                <View style={styles.onlineDot} />
+                <Text style={styles.onlineText}>Online</Text>
+              </View>
             </View>
+            <ExitHeaderButton variant="light" compact />
           </View>
         </View>
 
@@ -94,6 +101,37 @@ export function HomeScreen() {
           <Text style={styles.profileMeta}>
             Centro de custo {currentUser.centroCusto} | Gestor {managerName}
           </Text>
+          <View style={styles.licenseCard}>
+            <View style={styles.licenseCopy}>
+              <View style={styles.licenseTitleRow}>
+                <Feather name="credit-card" size={16} color={colors.primaryDark} />
+                <Text style={styles.licenseTitle}>CNH digital</Text>
+              </View>
+              <Text style={styles.licenseMeta}>
+                Categoria {currentUser.cnhCategoria} | Emissao {currentUser.cnhUfEmissao}
+              </Text>
+              <Text style={styles.licenseMeta}>
+                Ultima validacao {formatDateTime(currentUser.cnhDataUltimaValidacao)}
+              </Text>
+            </View>
+            <Pressable
+              style={[
+                styles.licenseAction,
+                !currentUser.cnhAnexo && styles.licenseActionDisabled,
+              ]}
+              onPress={() => setLicenseUser(currentUser)}
+              disabled={!currentUser.cnhAnexo}
+            >
+              <Text
+                style={[
+                  styles.licenseActionText,
+                  !currentUser.cnhAnexo && styles.licenseActionTextDisabled,
+                ]}
+              >
+                Ver PDF
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.summaryRow}>
@@ -145,6 +183,8 @@ export function HomeScreen() {
           ))}
         </View>
       </View>
+
+      <DriverLicensePreviewModal user={licenseUser} onClose={() => setLicenseUser(null)} />
     </ScreenContainer>
   );
 }
@@ -183,6 +223,10 @@ const styles = StyleSheet.create({
   userInfo: {
     alignItems: "flex-end",
     gap: 4,
+  },
+  userActions: {
+    alignItems: "flex-end",
+    gap: spacing.sm,
   },
   userName: {
     color: colors.white,
@@ -269,6 +313,56 @@ const styles = StyleSheet.create({
   },
   cnhBadgeTextExpired: {
     color: colors.danger,
+  },
+  licenseCard: {
+    marginTop: spacing.xs,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    padding: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  licenseCopy: {
+    flex: 1,
+    gap: spacing.xxs,
+  },
+  licenseTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  licenseTitle: {
+    color: colors.primaryDark,
+    fontSize: typography.bodySmall,
+    fontWeight: "700",
+  },
+  licenseMeta: {
+    color: colors.textSecondary,
+    fontSize: typography.caption,
+  },
+  licenseAction: {
+    minWidth: 88,
+    minHeight: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.primaryDark,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
+  },
+  licenseActionDisabled: {
+    backgroundColor: colors.disabled,
+  },
+  licenseActionText: {
+    color: colors.white,
+    fontSize: typography.caption,
+    fontWeight: "700",
+  },
+  licenseActionTextDisabled: {
+    color: colors.textMuted,
   },
   summaryRow: {
     flexDirection: "row",

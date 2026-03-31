@@ -2,8 +2,13 @@ import { reservationStatusLabel, resourceStatusLabel } from "@/constants/status"
 import type { Reservation, ReservationStatus, Resource, ResourceStatus } from "@/types";
 import { isWithinRange, toDate } from "./date";
 
-export const RESERVATION_BLOCKING_STATUSES: ReservationStatus[] = ["Pendente", "Aprovada", "Em uso"];
-export const RESERVATION_ACTIVE_STATUSES: ReservationStatus[] = ["Aprovada", "Em uso"];
+export const RESERVATION_BLOCKING_STATUSES: ReservationStatus[] = [
+  "Pendente",
+  "Aprovada",
+  "Em uso",
+  "Em atraso",
+];
+export const RESERVATION_ACTIVE_STATUSES: ReservationStatus[] = ["Aprovada", "Em uso", "Em atraso"];
 
 export const reservationChecklistLabels = {
   vehicleClean: "Veículo limpo",
@@ -172,15 +177,13 @@ export const getCurrentResourceStatus = (
 
   if (
     currentReservations.some(
-      (reservation) =>
-        (reservation.status === "Em uso" || reservation.status === "Em atraso") &&
-        isWithinRange(referenceDate, reservation.startDate, reservation.endDate)
+      (reservation) => reservation.status === "Em uso" || reservation.status === "Em atraso"
     )
   ) {
     return "Em uso";
   }
 
-   if (
+  if (
     currentReservations.some(
       (reservation) =>
         (reservation.status === "Pendente" || reservation.status === "Aprovada") &&
@@ -242,7 +245,7 @@ export const getFleetSummary = (
 export const getSummaryCounts = (resources: Resource[], reservations: Reservation[]) => ({
   availableResources: getFleetSummary(resources, reservations).available,
   activeReservations: reservations.filter((item) =>
-    ["Pendente", "Aprovada", "Em uso"].includes(item.status)
+    ["Pendente", "Aprovada", "Em uso", "Em atraso"].includes(item.status)
   ).length,
   maintenanceResources: getFleetSummary(resources, reservations).maintenance,
 });

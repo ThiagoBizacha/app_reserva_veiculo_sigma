@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
   Card,
   EmptyState,
+  ExitHeaderButton,
   Header,
   PrimaryButton,
   ReservationCard,
@@ -47,6 +48,7 @@ export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) 
         <Header
           eyebrow={resource.vehicleCategory ?? resource.category}
           title={resource.name}
+          rightContent={<ExitHeaderButton />}
           subtitle={`${resource.plate ?? resource.code} | ${resource.location}`}
         />
       }

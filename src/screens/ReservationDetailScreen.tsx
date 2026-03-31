@@ -1,9 +1,10 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   Card,
   EmptyState,
+  ExitHeaderButton,
   Header,
   PrimaryButton,
   ScreenContainer,
@@ -64,6 +65,7 @@ export function ReservationDetailScreen({ reservationId }: ReservationDetailScre
         <Header
           eyebrow={reservation.code}
           title="Detalhe da reserva"
+          rightContent={<ExitHeaderButton />}
           subtitle="Resumo completo do ciclo operacional, vistoria e histórico do veículo."
         />
       }
@@ -92,10 +94,7 @@ export function ReservationDetailScreen({ reservationId }: ReservationDetailScre
       </Card>
 
       {reservation.checkInData ? (
-        <InspectionCard
-          title="Vistoria de Saída"
-          inspection={reservation.checkInData}
-        />
+        <InspectionCard title="Vistoria de Saída" inspection={reservation.checkInData} />
       ) : null}
 
       {reservation.checkOutData ? (
@@ -185,11 +184,7 @@ function InspectionCard({
         <Text style={styles.photoSectionTitle}>Fotos da vistoria</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoStrip}>
           {requiredPhotoSlots.map(({ key, label }) => (
-            <PhotoPreview
-              key={key}
-              label={label}
-              uri={inspection.requiredPhotos[key]?.uri}
-            />
+            <PhotoPreview key={key} label={label} uri={inspection.requiredPhotos[key]?.uri} />
           ))}
           {inspection.additionalPhotos.map((photo) => (
             <PhotoPreview key={photo.id} label="Adicional" uri={photo.uri} />
