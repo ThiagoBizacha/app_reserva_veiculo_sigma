@@ -2,7 +2,7 @@
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { ExitHeaderButton, PageHeader, ScreenContainer, VehicleDocumentPreviewModal } from "@/components";
+import { PageHeader, ScreenContainer, VehicleDocumentPreviewModal } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import { formatDate, isWithinRange } from "@/utils/date";
@@ -105,17 +105,10 @@ export function ResourcesScreen() {
     <ScreenContainer>
       <PageHeader
         title="Frota de Veículos"
-        subtitle="Consulte a disponibilidade, os documentos e os próximos bloqueios da frota."
         rightContent={
-          <View style={styles.headerActions}>
-            <ExitHeaderButton variant="light" compact />
-            <Pressable
-              style={styles.plusButton}
-              onPress={() => router.push({ pathname: "/reservation/new" })}
-            >
-              <Feather name="plus" size={18} color={colors.white} />
-            </Pressable>
-          </View>
+          <Pressable style={styles.plusButton} onPress={() => router.push({ pathname: "/reservation/new" })}>
+            <Feather name="plus" size={18} color={colors.white} />
+          </Pressable>
         }
       />
 
@@ -291,18 +284,13 @@ const styles = StyleSheet.create({
     fontSize: typography.title,
     fontWeight: "700",
   },
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
   plusButton: {
-    width: 40,
-    height: 40,
+    width: 42,
+    height: 42,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.22)",
-    backgroundColor: "rgba(255,255,255,0.10)",
+    borderColor: "rgba(255,255,255,0.24)",
+    backgroundColor: "rgba(255,255,255,0.12)",
     alignItems: "center",
     justifyContent: "center",
   },

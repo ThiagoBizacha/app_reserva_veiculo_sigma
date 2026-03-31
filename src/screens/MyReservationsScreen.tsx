@@ -2,7 +2,7 @@
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { EmptyState, ExitHeaderButton, PageHeader, ScreenContainer, StatusBadge } from "@/components";
+import { EmptyState, PageHeader, ScreenContainer, StatusBadge } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import { formatDateTime } from "@/utils/date";
@@ -76,11 +76,7 @@ export function MyReservationsScreen() {
 
   return (
     <ScreenContainer>
-      <PageHeader
-        title="Minhas Reservas"
-        subtitle="Acompanhe o status e execute a próxima ação sem trocar de fluxo."
-        rightContent={<ExitHeaderButton variant="light" compact />}
-      />
+      <PageHeader title="Minhas Reservas" />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterTabs}>
         {(["Ativas", "Em uso", "Concluídas", "Canceladas"] as ReservationFilter[]).map((item) => {

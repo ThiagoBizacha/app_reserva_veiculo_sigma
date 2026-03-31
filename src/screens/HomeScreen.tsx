@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -75,16 +75,9 @@ export function HomeScreen() {
       </LinearGradient>
 
       <View style={styles.bodyStack}>
-        <View style={styles.tipCard}>
-          <View style={styles.tipIcon}>
-            <Feather name="info" size={16} color={colors.primaryDark} />
-          </View>
-          <View style={styles.tipCopy}>
-            <Text style={styles.tipLabel}>Dica rápida</Text>
-            <Text style={styles.tipText}>
-              Use a agenda para escolher o veículo e reservar com menos etapas.
-            </Text>
-          </View>
+        <View style={styles.tipInline}>
+          <MaterialCommunityIcons name="lightbulb-on-outline" size={16} color={colors.primary} />
+          <Text style={styles.tipText}>Use a agenda para escolher o veículo e reservar com menos etapas.</Text>
         </View>
 
         <View style={styles.content}>
@@ -282,40 +275,17 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     marginTop: -spacing.lg,
   },
-  tipCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
+  tipInline: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
-    ...shadows.soft,
-  },
-  tipIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primarySoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  tipCopy: {
-    flex: 1,
-    gap: 2,
-  },
-  tipLabel: {
-    color: colors.primaryDark,
-    fontSize: typography.caption,
-    fontWeight: "800",
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
+    gap: spacing.xs,
+    paddingHorizontal: spacing.xs,
   },
   tipText: {
     color: colors.textSecondary,
-    fontSize: typography.bodySmall,
-    lineHeight: 20,
+    fontSize: typography.caption,
+    lineHeight: 18,
+    flexShrink: 1,
   },
   content: {
     gap: spacing.lg,

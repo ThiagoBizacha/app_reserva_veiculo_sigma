@@ -5,7 +5,6 @@ import { colors, radius, spacing, typography } from "@/theme";
 
 interface PageHeaderProps {
   title: string;
-  subtitle?: string;
   eyebrow?: string;
   leftAction?: ReactNode;
   rightContent?: ReactNode;
@@ -13,7 +12,6 @@ interface PageHeaderProps {
 
 export function PageHeader({
   title,
-  subtitle,
   eyebrow,
   leftAction,
   rightContent,
@@ -21,19 +19,20 @@ export function PageHeader({
   return (
     <LinearGradient colors={[colors.primaryDark, colors.green700]} style={styles.container}>
       <View style={styles.row}>
-        {leftAction ? <View style={styles.leading}>{leftAction}</View> : null}
+        <View style={styles.sideSlot}>{leftAction}</View>
 
         <View style={styles.copy}>
-          {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
-          <Text style={styles.title}>{title}</Text>
-          {subtitle ? (
-            <Text numberOfLines={2} style={styles.subtitle}>
-              {subtitle}
+          {eyebrow ? (
+            <Text numberOfLines={1} style={styles.eyebrow}>
+              {eyebrow}
             </Text>
           ) : null}
+          <Text numberOfLines={2} style={styles.title}>
+            {title}
+          </Text>
         </View>
 
-        {rightContent ? <View style={styles.trailing}>{rightContent}</View> : null}
+        <View style={styles.sideSlot}>{rightContent}</View>
       </View>
     </LinearGradient>
   );
@@ -46,20 +45,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.lg,
+    minHeight: 112,
     borderBottomLeftRadius: radius.xl,
     borderBottomRightRadius: radius.xl,
+    justifyContent: "center",
   },
   row: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.md,
+    alignItems: "center",
+    gap: spacing.sm,
   },
-  leading: {
-    paddingTop: 2,
+  sideSlot: {
+    width: 52,
+    alignItems: "center",
+    justifyContent: "center",
   },
   copy: {
     flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
     gap: spacing.xxs,
+    paddingHorizontal: spacing.sm,
   },
   eyebrow: {
     color: "#DDEED6",
@@ -67,21 +73,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 0.8,
+    textAlign: "center",
   },
   title: {
     color: colors.white,
     fontSize: typography.title,
     fontWeight: "800",
-  },
-  subtitle: {
-    color: "#E3F7EE",
-    fontSize: typography.bodySmall,
-    lineHeight: 20,
-  },
-  trailing: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    paddingTop: 2,
+    lineHeight: 30,
+    textAlign: "center",
   },
 });

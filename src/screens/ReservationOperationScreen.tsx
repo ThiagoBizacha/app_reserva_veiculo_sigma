@@ -16,7 +16,6 @@ import {
 import {
   BackHeaderButton,
   EmptyState,
-  ExitHeaderButton,
   OperationStepper,
   PageHeader,
   PhotoSlotCard,
@@ -674,13 +673,7 @@ export function ReservationOperationScreen({
         <PageHeader
           eyebrow={reservation.code}
           title={title}
-          subtitle={
-            resolvedMode === "checkin"
-              ? "Registre condições, fotos e assinatura antes da saída do veículo."
-              : "Registre a devolução com evidências e assinatura do recebimento."
-          }
           leftAction={<BackHeaderButton />}
-          rightContent={<ExitHeaderButton variant="light" compact />}
         />
       </View>
 

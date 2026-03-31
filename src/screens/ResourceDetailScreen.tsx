@@ -5,7 +5,6 @@ import {
   BackHeaderButton,
   Card,
   EmptyState,
-  ExitHeaderButton,
   PageHeader,
   PrimaryButton,
   ReservationCard,
@@ -50,8 +49,6 @@ export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) 
           eyebrow={resource.vehicleCategory ?? resource.category}
           title={resource.name}
           leftAction={<BackHeaderButton />}
-          rightContent={<ExitHeaderButton variant="light" compact />}
-          subtitle={`${resource.plate ?? resource.code} | ${resource.rentalCompany ?? "Frota"}`}
         />
       }
     >

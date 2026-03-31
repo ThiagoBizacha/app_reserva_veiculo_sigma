@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { BackHeaderButton, ExitHeaderButton, PageHeader, ScreenContainer } from "@/components";
+import { BackHeaderButton, PageHeader, ScreenContainer } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import { formatDate, isWithinRange } from "@/utils/date";
@@ -96,12 +96,7 @@ export function AdminScreen() {
 
   return (
     <ScreenContainer>
-      <PageHeader
-        title="Painel da Frota"
-        subtitle="Acompanhe indicadores, reservas ativas e manutenção em um único painel."
-        leftAction={<BackHeaderButton />}
-        rightContent={<ExitHeaderButton variant="light" compact />}
-      />
+      <PageHeader title="Painel da Frota" leftAction={<BackHeaderButton />} />
 
       <View style={styles.metricsRow}>
         <MetricCard value={summary.available} label="Disponíveis" color={colors.primaryDark} />

@@ -2,7 +2,7 @@
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { EmptyState, ExitHeaderButton, PageHeader, ScreenContainer, StatusBadge } from "@/components";
+import { EmptyState, PageHeader, ScreenContainer, StatusBadge } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import {
@@ -114,11 +114,7 @@ export function AgendaScreen({ initialResourceId }: AgendaScreenProps) {
 
   return (
     <ScreenContainer>
-      <PageHeader
-        title="Agenda"
-        subtitle="Escolha o veículo, toque no dia e tome a próxima ação sem sair do contexto."
-        rightContent={<ExitHeaderButton variant="light" compact />}
-      />
+      <PageHeader title="Agenda" />
 
       <View style={styles.selectorBlock}>
         <Text style={styles.selectorLabel}>Veículo</Text>

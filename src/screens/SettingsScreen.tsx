@@ -4,7 +4,6 @@ import { type ReactNode, useState } from "react";
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   Card,
-  ExitHeaderButton,
   FormField,
   MetricCard,
   PageHeader,
@@ -622,11 +621,7 @@ export function SettingsScreen() {
   return (
     <>
       <ScreenContainer>
-        <PageHeader
-          title="Configurações"
-          subtitle="Gerencie cadastros e exporte a base de reservas com um fluxo mais limpo."
-          rightContent={<ExitHeaderButton variant="light" compact />}
-        />
+        <PageHeader title="Configurações" />
 
         <View style={styles.metricsRow}>
           <MetricCard label="Veículos" value={totalVehicles} helper="Base de frota atual" />

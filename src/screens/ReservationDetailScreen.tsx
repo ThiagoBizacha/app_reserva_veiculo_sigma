@@ -5,7 +5,6 @@ import {
   BackHeaderButton,
   Card,
   EmptyState,
-  ExitHeaderButton,
   PageHeader,
   PrimaryButton,
   ScreenContainer,
@@ -67,8 +66,6 @@ export function ReservationDetailScreen({ reservationId }: ReservationDetailScre
           eyebrow={reservation.code}
           title="Detalhe da reserva"
           leftAction={<BackHeaderButton />}
-          rightContent={<ExitHeaderButton variant="light" compact />}
-          subtitle="Resumo completo do ciclo operacional, vistoria e histórico do veículo."
         />
       }
     >
