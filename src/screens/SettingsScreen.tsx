@@ -41,8 +41,6 @@ const emptyVehicleForm: NewVehiclePayload = {
   year: "",
   vehicleCategory: "SUV",
   currentMileage: "",
-  location: "",
-  responsible: "",
   description: "",
   rentalCompany: "",
   vehicleDocumentAttachment: "",
@@ -84,8 +82,6 @@ function mapVehicleToForm(resource: Resource): NewVehiclePayload {
     year: resource.year ?? "",
     vehicleCategory: resource.vehicleCategory ?? "SUV",
     currentMileage: resource.currentMileage ?? "",
-    location: resource.location,
-    responsible: resource.responsible,
     description: resource.description,
     rentalCompany: resource.rentalCompany ?? "",
     vehicleDocumentAttachment: resource.vehicleDocumentAttachment ?? "",
@@ -679,7 +675,7 @@ export function SettingsScreen() {
                       icon="truck"
                       title={`${vehicle.code} · ${vehicle.name}`}
                       subtitle={`${vehicle.plate ?? "Sem placa"} · ${vehicle.brand ?? "-"} ${vehicle.model ?? ""}`.trim()}
-                      meta={`${vehicle.location} | Responsável: ${vehicle.responsible}`}
+                      meta={`Locadora: ${vehicle.rentalCompany ?? "-"} | Km: ${vehicle.currentMileage ?? "-"}`}
                       badgeLabel={getVehicleStatusLabel(vehicle.status)}
                       badgeTone={getVehicleStatusTone(vehicle.status)}
                       onPress={() => openVehicleEditModal(vehicle)}
@@ -857,24 +853,6 @@ export function SettingsScreen() {
             options={vehicleCategories}
             onChange={(value) => updateVehicleField("vehicleCategory", value as VehicleCategory)}
           />
-          <View style={styles.row}>
-            <View style={styles.column}>
-              <FormField
-                label="Localização"
-                placeholder="Base Matriz - BH"
-                value={vehicleForm.location}
-                onChangeText={(value) => updateVehicleField("location", value)}
-              />
-            </View>
-            <View style={styles.column}>
-              <FormField
-                label="Responsável"
-                placeholder="Nome do responsável"
-                value={vehicleForm.responsible}
-                onChangeText={(value) => updateVehicleField("responsible", value)}
-              />
-            </View>
-          </View>
           <View style={styles.row}>
             <View style={styles.column}>
               <FormField

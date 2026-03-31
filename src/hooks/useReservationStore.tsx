@@ -268,8 +268,6 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       payload.model,
       payload.year,
       payload.currentMileage,
-      payload.location,
-      payload.responsible,
       payload.description,
     ];
 
@@ -334,10 +332,10 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       lastMaintenanceMileage: existingResource?.lastMaintenanceMileage ?? normalizedMileage,
       nextMaintenanceMileage: payload.nextMaintenanceMileage?.trim() || undefined,
       observation: payload.observation?.trim() || undefined,
-      location: payload.location.trim(),
+      location: payload.location?.trim() || existingResource?.location || "Base interna",
       capacity: existingResource?.capacity ?? "5 lugares",
       description: payload.description.trim(),
-      responsible: payload.responsible.trim(),
+      responsible: existingResource?.responsible || undefined,
       requiresApproval: payload.requiresApproval ?? true,
       imageHint: payload.vehicleCategory.toLowerCase(),
       nextAvailableAt: existingResource?.nextAvailableAt,

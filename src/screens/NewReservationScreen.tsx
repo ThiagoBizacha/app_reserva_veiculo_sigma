@@ -150,10 +150,10 @@ export function NewReservationScreen({
               <View style={styles.resourceSnapshotCopy}>
                 <Text style={styles.resourceSnapshotTitle}>{selectedResource.name}</Text>
                 <Text style={styles.resourceSnapshotMeta}>
-                  {selectedResource.plate ?? selectedResource.code} | {selectedResource.location}
+                  {selectedResource.plate ?? selectedResource.code} | {selectedResource.vehicleCategory ?? "-"}
                 </Text>
                 <Text style={styles.resourceSnapshotMeta}>
-                  {selectedResource.rentalCompany ?? "-"} | Km {selectedResource.currentMileage ?? "-"} | {selectedResource.responsible}
+                  {selectedResource.rentalCompany ?? "-"} | Km {selectedResource.currentMileage ?? "-"}
                 </Text>
               </View>
               <StatusBadge status={selectedResourceStatus} kind="resource" />
@@ -298,7 +298,7 @@ export function NewReservationScreen({
                       <View style={styles.modalItemCopy}>
                         <Text style={styles.modalItemTitle}>{resource.name}</Text>
                         <Text style={styles.modalItemMeta}>
-                          {resource.plate ?? resource.code} | {resource.brand ?? "-"} {resource.model ?? ""} | {resource.location}
+                          {resource.plate ?? resource.code} | {resource.brand ?? "-"} {resource.model ?? ""}
                         </Text>
                         <Text style={styles.modalItemMeta}>
                           {resource.rentalCompany ?? "-"} | Km {resource.currentMileage ?? "-"}

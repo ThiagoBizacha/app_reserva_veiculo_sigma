@@ -298,7 +298,7 @@ export function AgendaScreen({ initialResourceId }: AgendaScreenProps) {
                     <View style={styles.modalItemCopy}>
                       <Text style={styles.modalItemTitle}>{resource.name}</Text>
                       <Text style={styles.modalItemMeta}>
-                        {resource.plate ?? resource.code} | {resource.location}
+                        {resource.plate ?? resource.code} | {resource.vehicleCategory ?? resource.category}
                       </Text>
                       <Text style={styles.modalItemMeta}>
                         {resource.rentalCompany ?? "-"} | Km {resource.currentMileage ?? "-"}

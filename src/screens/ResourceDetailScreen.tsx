@@ -49,7 +49,7 @@ export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) 
           eyebrow={resource.vehicleCategory ?? resource.category}
           title={resource.name}
           rightContent={<ExitHeaderButton />}
-          subtitle={`${resource.plate ?? resource.code} | ${resource.location}`}
+          subtitle={`${resource.plate ?? resource.code} | ${resource.rentalCompany ?? "Frota"}`}
         />
       }
     >
@@ -71,8 +71,6 @@ export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) 
         </MetaBlock>
 
         <MetaBlock label="Operação">
-          <Text style={styles.metaValue}>Responsável {resource.responsible}</Text>
-          <Text style={styles.metaValue}>Base {resource.location}</Text>
           {resource.observation ? <Text style={styles.metaValue}>{resource.observation}</Text> : null}
         </MetaBlock>
 

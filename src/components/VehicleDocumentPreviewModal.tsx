@@ -68,8 +68,6 @@ export function VehicleDocumentPreviewModal({
                 <DocumentField label="Categoria" value={resource.vehicleCategory ?? "-"} />
                 <DocumentField label="Locadora" value={resource.rentalCompany ?? "-"} />
                 <DocumentField label="Capacidade" value={resource.capacity ?? "-"} />
-                <DocumentField label="Base" value={resource.location} />
-                <DocumentField label="Responsável" value={resource.responsible} />
               </View>
 
               <Section title="Controle operacional">

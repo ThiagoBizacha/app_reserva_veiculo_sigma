@@ -24,8 +24,16 @@ export function ResourceCard({ resource }: ResourceCardProps) {
         <Text style={styles.description}>{resource.description}</Text>
       </View>
       <View style={styles.metaRow}>
-        <Text style={styles.metaLabel}>{resource.location}</Text>
-        <Text style={styles.metaLabel}>{resource.category}</Text>
+        <Text style={styles.metaLabel}>
+          {resource.category === "Veiculo"
+            ? resource.plate ?? resource.code
+            : resource.location}
+        </Text>
+        <Text style={styles.metaLabel}>
+          {resource.category === "Veiculo"
+            ? resource.vehicleCategory ?? resource.category
+            : resource.category}
+        </Text>
       </View>
     </Card>
   );

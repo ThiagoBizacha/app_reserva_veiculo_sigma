@@ -99,9 +99,7 @@ export function ReservationOperationScreen({
     existingInspection?.fuelLevel ?? null
   );
   const [notes, setNotes] = useState(existingInspection?.notes ?? "");
-  const [counterpartyName, setCounterpartyName] = useState(
-    existingInspection?.counterpartyName ?? resource?.responsible ?? ""
-  );
+  const [counterpartyName, setCounterpartyName] = useState(existingInspection?.counterpartyName ?? "");
   const [damageIdentified, setDamageIdentified] = useState(
     existingInspection?.damageIdentified ?? false
   );
@@ -388,7 +386,7 @@ export function ReservationOperationScreen({
             : `Devolução registrada em ${formatDateTime(new Date())}`}
         </Text>
         <Text style={styles.vehicleBannerMeta}>
-          {resource.rentalCompany ?? "-"} | Km {resource.currentMileage ?? "-"} | {resource.location}
+          {resource.rentalCompany ?? "-"} | Km {resource.currentMileage ?? "-"}
         </Text>
       </View>
     </View>
@@ -532,7 +530,7 @@ export function ReservationOperationScreen({
       {renderChecklist()}
       {renderDamageSection()}
 
-      <Section title={resolvedMode === "checkin" ? "Responsável pela frota" : "Confirmação operacional"}>
+      <Section title={resolvedMode === "checkin" ? "Entrega do veículo" : "Confirmação operacional"}>
         <Text style={styles.fieldLabel}>
           {resolvedMode === "checkin" ? "Entregue por" : "Recebido por"}
         </Text>
@@ -541,7 +539,7 @@ export function ReservationOperationScreen({
           onChangeText={setCounterpartyName}
           placeholder={
             resolvedMode === "checkin"
-              ? "Nome do responsável da frota"
+              ? "Nome de quem entregou o veículo"
               : "Nome de quem recebeu o veículo"
           }
           placeholderTextColor={colors.textMuted}

@@ -13,8 +13,8 @@ export interface NewVehiclePayload {
   year: string;
   vehicleCategory: VehicleCategory;
   currentMileage: string;
-  location: string;
-  responsible: string;
+  location?: string;
+  responsible?: string;
   description: string;
   rentalCompany?: string;
   vehicleDocumentAttachment?: string;
@@ -49,7 +49,7 @@ export interface Resource {
   location: string;
   capacity?: string;
   description: string;
-  responsible: string;
+  responsible?: string;
   requiresApproval: boolean;
   imageHint: string;
   nextAvailableAt?: string;

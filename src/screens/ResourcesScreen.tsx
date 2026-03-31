@@ -121,7 +121,7 @@ export function ResourcesScreen() {
         <TextInput
           value={search}
           onChangeText={setSearch}
-          placeholder="Buscar veículo, placa ou local"
+          placeholder="Buscar veículo, placa ou locadora"
           placeholderTextColor={colors.textMuted}
           style={styles.searchInput}
         />
@@ -187,9 +187,8 @@ export function ResourcesScreen() {
                 {resource.brand ?? "-"} {resource.model ?? ""} | {resource.year ?? "-"} | {resource.vehicleCategory ?? "-"}
               </Text>
               <Text style={styles.metaText}>
-                Locadora: {resource.rentalCompany ?? "-"} | Local: {resource.location}
+                Locadora: {resource.rentalCompany ?? "-"} | Km atual: {resource.currentMileage ?? "-"}
               </Text>
-              <Text style={styles.metaText}>Km atual: {resource.currentMileage ?? "-"}</Text>
               {computedStatus === "Disponivel" && nextReservation ? (
                 <Text style={styles.metaText}>
                   Próxima reserva: {formatDate(nextReservation.startDate)}
@@ -214,7 +213,6 @@ export function ResourcesScreen() {
                   Próxima manutenção: {formatDate(resource.nextMaintenanceDate)} | Km {resource.nextMaintenanceMileage ?? "-"}
                 </Text>
               ) : null}
-              <Text style={styles.metaText}>Responsável: {resource.responsible}</Text>
             </View>
 
             <View style={styles.utilityActionsRow}>
