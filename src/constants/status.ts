@@ -1,4 +1,4 @@
-import type { ReservationStatus, ResourceStatus } from "@/types";
+﻿import type { ReservationStatus, ResourceStatus } from "@/types";
 
 export const resourceStatusLabel: Record<ResourceStatus, string> = {
   Disponivel: "Disponível",
@@ -15,3 +15,4 @@ export const reservationStatusLabel: Record<ReservationStatus, string> = {
   Cancelada: "Cancelada",
   "Em atraso": "Em atraso",
 };
+

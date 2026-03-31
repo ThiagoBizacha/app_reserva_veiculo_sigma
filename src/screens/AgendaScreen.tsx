@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+﻿import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -24,26 +24,26 @@ const weekLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
 
 const availabilityCopy = {
   disponivel: {
-    title: "Disponivel",
-    description: "O veiculo esta livre para uma nova reserva nesta data.",
+    title: "Disponível",
+    description: "O veículo está livre para uma nova reserva nesta data.",
     color: colors.success,
     backgroundColor: `${colors.success}12`,
   },
   reservado: {
     title: "Reservado",
-    description: "Ja existe um bloqueio parcial neste dia. Consulte os horarios antes de reservar.",
+    description: "Já existe um bloqueio parcial neste dia. Consulte os horários antes de reservar.",
     color: colors.info,
     backgroundColor: `${colors.info}12`,
   },
   emUso: {
     title: "Em uso",
-    description: "O veiculo possui uso registrado neste dia. Consulte o horario de devolucao.",
+    description: "O veículo possui uso registrado neste dia. Consulte o horário de devolução.",
     color: colors.warning,
     backgroundColor: "#FFF5E8",
   },
   manutencao: {
-    title: "Manutencao",
-    description: "O veiculo esta indisponivel por manutencao nesta data.",
+    title: "Manutenção",
+    description: "O veículo está indisponível por manutenção nesta data.",
     color: colors.danger,
     backgroundColor: `${colors.danger}10`,
   },
@@ -119,7 +119,7 @@ export function AgendaScreen({ initialResourceId }: AgendaScreenProps) {
           <View style={styles.headerCopy}>
             <Text style={styles.headerTitle}>Agenda</Text>
             <Text style={styles.headerSubtitle}>
-              Escolha o veiculo, toque no dia e tome a proxima acao sem sair do contexto.
+              Escolha o veículo, toque no dia e tome a próxima ação sem sair do contexto.
             </Text>
           </View>
           <ExitHeaderButton />
@@ -127,12 +127,12 @@ export function AgendaScreen({ initialResourceId }: AgendaScreenProps) {
       </View>
 
       <View style={styles.selectorBlock}>
-        <Text style={styles.selectorLabel}>Veiculo</Text>
+        <Text style={styles.selectorLabel}>Veículo</Text>
         <Pressable style={styles.selector} onPress={() => setIsVehicleModalOpen(true)}>
           <Text style={styles.selectorText}>
             {selectedResource
               ? `${selectedResource.name} | ${selectedResource.plate ?? selectedResource.code}`
-              : "Selecionar veiculo"}
+              : "Selecionar veículo"}
           </Text>
           <Feather name="chevron-down" size={18} color={colors.textMuted} />
         </Pressable>
@@ -206,7 +206,7 @@ export function AgendaScreen({ initialResourceId }: AgendaScreenProps) {
             <Text style={styles.dayCardTitle}>{formatDate(selectedDate)}</Text>
             <Text style={styles.dayCardDescription}>
               {isPastDay
-                ? "A data selecionada esta no historico. Consulte o que aconteceu neste dia."
+                ? "A data selecionada está no histórico. Consulte o que aconteceu neste dia."
                 : dayCard.description}
             </Text>
           </View>
@@ -218,7 +218,7 @@ export function AgendaScreen({ initialResourceId }: AgendaScreenProps) {
         <View style={styles.dayActions}>
           {!isPastDay && selectedDayAvailability.state !== "manutencao" ? (
             <Pressable style={styles.primaryAction} onPress={handleOpenNewReservation}>
-              <Text style={styles.primaryActionText}>Escolher horario neste dia</Text>
+              <Text style={styles.primaryActionText}>Escolher horário neste dia</Text>
             </Pressable>
           ) : null}
 
@@ -262,7 +262,7 @@ export function AgendaScreen({ initialResourceId }: AgendaScreenProps) {
               <View style={styles.reservationRowCopy}>
                 <Text style={styles.reservationRowTitle}>{reservation.code}</Text>
                 <Text style={styles.reservationRowText}>
-                  {formatDateTime(reservation.startDate)} ate {formatDateTime(reservation.endDate)}
+                  {formatDateTime(reservation.startDate)} até {formatDateTime(reservation.endDate)}
                 </Text>
                 <Text style={styles.reservationRowText}>{reservation.purpose}</Text>
               </View>
@@ -280,7 +280,7 @@ export function AgendaScreen({ initialResourceId }: AgendaScreenProps) {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Selecionar veiculo</Text>
+            <Text style={styles.modalTitle}>Selecionar veículo</Text>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalList}>
               {vehicles.map((resource) => {
                 const isActive = resource.id === selectedResourceId;
@@ -614,3 +614,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
+
+
+

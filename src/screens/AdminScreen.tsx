@@ -22,15 +22,21 @@ export function AdminScreen() {
         isWithinRange(today, reservation.startDate, reservation.endDate)
     )
     .slice(0, 3);
-  const pendingReservations = reservations.filter((reservation) => reservation.status === "Pendente");
+  const pendingReservations = reservations.filter(
+    (reservation) => reservation.status === "Pendente"
+  );
   const maintenanceVehicles = vehicles
     .filter((resource) => resource.status === "Manutencao")
     .slice(0, 2);
   const activeReservations = reservations.filter((reservation) =>
     RESERVATION_ACTIVE_STATUSES.includes(reservation.status)
   );
-  const lateReservations = reservations.filter((reservation) => reservation.status === "Em atraso");
-  const documentsAvailable = vehicles.filter((resource) => Boolean(resource.vehicleDocumentAttachment)).length;
+  const lateReservations = reservations.filter(
+    (reservation) => reservation.status === "Em atraso"
+  );
+  const documentsAvailable = vehicles.filter((resource) =>
+    Boolean(resource.vehicleDocumentAttachment)
+  ).length;
   const upcomingMaintenance = vehicles.filter((resource) =>
     isDateWithinDays(resource.nextMaintenanceDate, 30)
   ).length;
@@ -47,8 +53,8 @@ export function AdminScreen() {
     {
       icon: "activity",
       value: `${occupancyRate}%`,
-      label: "Ocupacao",
-      helper: `${summary.reserved + summary.inUse} veiculos indisponiveis`,
+      label: "Ocupação",
+      helper: `${summary.reserved + summary.inUse} veículos indisponíveis`,
       accentColor: colors.info,
     },
     {
@@ -62,7 +68,7 @@ export function AdminScreen() {
       icon: "alert-triangle",
       value: String(lateReservations.length),
       label: "Em atraso",
-      helper: "Demandam acao da operacao",
+      helper: "Demandam ação da operação",
       accentColor: colors.danger,
     },
     {
@@ -75,15 +81,15 @@ export function AdminScreen() {
     {
       icon: "tool",
       value: String(upcomingMaintenance),
-      label: "Revisao 30d",
-      helper: "Manutencoes proximas",
+      label: "Revisão 30d",
+      helper: "Manutenções próximas",
       accentColor: colors.warning,
     },
     {
       icon: "bar-chart-2",
       value: averageMileage,
-      label: "Km medio",
-      helper: "Media da frota ativa",
+      label: "Km médio",
+      helper: "Média da frota ativa",
       accentColor: colors.primary,
     },
   ];
@@ -102,9 +108,9 @@ export function AdminScreen() {
       </View>
 
       <View style={styles.metricsRow}>
-        <MetricCard value={summary.available} label="Disponiveis" color={colors.primaryDark} />
-        <MetricCard value={summary.inUse} label="Em Uso" color={colors.warning} />
-        <MetricCard value={summary.maintenance} label="Manutencao" color={colors.danger} />
+        <MetricCard value={summary.available} label="Disponíveis" color={colors.primaryDark} />
+        <MetricCard value={summary.inUse} label="Em uso" color={colors.warning} />
+        <MetricCard value={summary.maintenance} label="Manutenção" color={colors.danger} />
       </View>
 
       <PanelCard title="Indicadores Operacionais">
@@ -118,26 +124,38 @@ export function AdminScreen() {
       <PanelCard title="Disponibilidade da Frota">
         <View style={styles.progressBar}>
           <View
-            style={[styles.progressSegment, { width: `${availablePercent}%`, backgroundColor: colors.success }]}
+            style={[
+              styles.progressSegment,
+              { width: `${availablePercent}%`, backgroundColor: colors.success },
+            ]}
           />
           <View
-            style={[styles.progressSegment, { width: `${reservedPercent}%`, backgroundColor: colors.info }]}
+            style={[
+              styles.progressSegment,
+              { width: `${reservedPercent}%`, backgroundColor: colors.info },
+            ]}
           />
           <View
-            style={[styles.progressSegment, { width: `${inUsePercent}%`, backgroundColor: colors.warning }]}
+            style={[
+              styles.progressSegment,
+              { width: `${inUsePercent}%`, backgroundColor: colors.warning },
+            ]}
           />
           <View
-            style={[styles.progressSegment, { width: `${maintenancePercent}%`, backgroundColor: colors.danger }]}
+            style={[
+              styles.progressSegment,
+              { width: `${maintenancePercent}%`, backgroundColor: colors.danger },
+            ]}
           />
         </View>
         <View style={styles.legendRow}>
-          <Legend color={colors.success} label={`Disponivel ${availablePercent}%`} />
+          <Legend color={colors.success} label={`Disponível ${availablePercent}%`} />
           <Legend color={colors.info} label={`Reservado ${reservedPercent}%`} />
           <Legend color={colors.warning} label={`Em uso ${inUsePercent}%`} />
-          <Legend color={colors.danger} label={`Manutencao ${maintenancePercent}%`} />
+          <Legend color={colors.danger} label={`Manutenção ${maintenancePercent}%`} />
         </View>
         <Text style={styles.footerText}>
-          {summary.total} veiculos no total | {summary.reserved} reservado(s) no periodo atual
+          {summary.total} veículos no total | {summary.reserved} reservado(s) no período atual
         </Text>
       </PanelCard>
 
@@ -174,18 +192,18 @@ export function AdminScreen() {
         )}
       </PanelCard>
 
-      <PanelCard title="Solicitacoes Pendentes de Aprovacao">
+      <PanelCard title="Solicitações Pendentes de Aprovação">
         <View style={styles.alertBox}>
           <Feather name="bell" size={16} color={colors.white} />
           <Text style={styles.alertText}>
-            {pendingReservations.length} reservas aguardando aprovacao do gestor
+            {pendingReservations.length} reservas aguardando aprovação do gestor
           </Text>
         </View>
       </PanelCard>
 
-      <PanelCard title="Proximas Manutencoes">
+      <PanelCard title="Próximas Manutenções">
         {maintenanceVehicles.length === 0 ? (
-          <Text style={styles.emptyText}>Nenhuma manutencao programada.</Text>
+          <Text style={styles.emptyText}>Nenhuma manutenção programada.</Text>
         ) : (
           maintenanceVehicles.map((vehicle, index) => (
             <View

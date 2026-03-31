@@ -1,12 +1,14 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+﻿import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   currentUserId,
   reservations as initialReservations,
   resources as initialResources,
-  users,
+  users as initialUsers,
 } from "@/data";
 import type {
   NewReservationPayload,
+  NewUserPayload,
+  NewVehiclePayload,
   Reservation,
   ReservationInspection,
   ReservationOperationPayload,
@@ -33,6 +35,7 @@ import {
   isResourceInMaintenanceOnDate,
 } from "@/utils/reservations";
 import { getDurationHours, isSameCalendarDay } from "@/utils/date";
+import { buildReservationsCsv, downloadCsvForExcel } from "@/utils/export";
 import {
   hasSignature,
   parseMileageValue,
@@ -42,6 +45,9 @@ interface ActionResult {
   success: boolean;
   message: string;
   reservation?: Reservation;
+  resource?: Resource;
+  user?: User;
+  fileUri?: string;
 }
 
 interface ReservationStoreValue {
@@ -52,10 +58,13 @@ interface ReservationStoreValue {
   currentUserId: string;
   currentUserName: string;
   toggleResourceMaintenance: (resourceId: string) => void;
+  createVehicle: (payload: NewVehiclePayload) => ActionResult;
+  createUser: (payload: NewUserPayload) => ActionResult;
   createReservation: (payload: NewReservationPayload) => ActionResult;
   cancelReservation: (reservationId: string) => ActionResult;
   checkInReservation: (reservationId: string, payload: ReservationOperationPayload) => ActionResult;
   checkOutReservation: (reservationId: string, payload: ReservationOperationPayload) => ActionResult;
+  exportReservationsReport: () => Promise<ActionResult>;
   getResourceStatus: (resourceId: string, referenceDate?: Date) => ResourceStatus;
   getReservationsForResource: (resourceId: string) => Reservation[];
   getReservationsForDay: (resourceId: string, date: Date) => Reservation[];
@@ -74,22 +83,24 @@ interface ReservationStoreValue {
 }
 
 const STORAGE_KEYS = {
-  mockVersion: "@sigma-reserva/mock-version",
+  mockeersion: "@sigma-reserva/mock-version",
   reservations: "@sigma-reserva/reservations",
   resources: "@sigma-reserva/resources",
+  users: "@sigma-reserva/users",
 };
 
-const MOCK_DATA_VERSION = "2026-03-27-reservation-policy-v2";
+const MOCK_DATA_eERSION = "2026-03-27-reservation-policy-v2";
 
 const ReservationStoreContext = createContext<ReservationStoreValue | null>(null);
 
 export function ReservationStoreProvider({ children }: PropsWithChildren) {
+  const [usersData, setUsersData] = useState(initialUsers);
   const [resources, setResources] = useState(initialResources);
   const [reservations, setReservations] = useState(initialReservations);
   const [isHydrated, setIsHydrated] = useState(false);
 
   const currentUser =
-    users.find((user) => user.id === currentUserId) ?? users[0];
+    usersData.find((user) => user.id === currentUserId) ?? usersData[0] ?? initialUsers[0];
   const currentUserName = currentUser?.name ?? "Usuario";
 
   useEffect(() => {
@@ -97,38 +108,46 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
 
     const hydrate = async () => {
       try {
-        const [storedVersion, storedReservations, storedResources] = await AsyncStorage.multiGet([
-          STORAGE_KEYS.mockVersion,
+        const [storedeersion, storedReservations, storedResources, storedUsers] = await AsyncStorage.multiGet([
+          STORAGE_KEYS.mockeersion,
           STORAGE_KEYS.reservations,
           STORAGE_KEYS.resources,
+          STORAGE_KEYS.users,
         ]);
 
         if (!active) {
           return;
         }
 
-        const versionValue = storedVersion[1];
-        const reservationsValue = storedReservations[1];
-        const resourcesValue = storedResources[1];
-        const shouldResetToLatestMocks = versionValue !== MOCK_DATA_VERSION;
+        const versionealue = storedeersion[1];
+        const reservationsealue = storedReservations[1];
+        const resourcesealue = storedResources[1];
+        const usersealue = storedUsers[1];
+        const shouldResetToLatestMocks = versionealue !== MOCK_DATA_eERSION;
 
         if (shouldResetToLatestMocks) {
+          setUsersData(initialUsers);
           setReservations(initialReservations);
           setResources(initialResources);
           await AsyncStorage.multiSet([
-            [STORAGE_KEYS.mockVersion, MOCK_DATA_VERSION],
+            [STORAGE_KEYS.mockeersion, MOCK_DATA_eERSION],
             [STORAGE_KEYS.reservations, JSON.stringify(initialReservations)],
             [STORAGE_KEYS.resources, JSON.stringify(initialResources)],
+            [STORAGE_KEYS.users, JSON.stringify(initialUsers)],
           ]);
           return;
         }
 
-        if (reservationsValue) {
-          setReservations(JSON.parse(reservationsValue));
+        if (reservationsealue) {
+          setReservations(JSON.parse(reservationsealue));
         }
 
-        if (resourcesValue) {
-          setResources(JSON.parse(resourcesValue));
+        if (resourcesealue) {
+          setResources(JSON.parse(resourcesealue));
+        }
+
+        if (usersealue) {
+          setUsersData(JSON.parse(usersealue));
         }
       } catch {
         // Keep bundled mocks when local storage is unavailable.
@@ -152,11 +171,12 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
     }
 
     void AsyncStorage.multiSet([
-      [STORAGE_KEYS.mockVersion, MOCK_DATA_VERSION],
+      [STORAGE_KEYS.mockeersion, MOCK_DATA_eERSION],
       [STORAGE_KEYS.reservations, JSON.stringify(reservations)],
       [STORAGE_KEYS.resources, JSON.stringify(resources)],
+      [STORAGE_KEYS.users, JSON.stringify(usersData)],
     ]);
-  }, [isHydrated, reservations, resources]);
+  }, [isHydrated, reservations, resources, usersData]);
 
   const appendHistoryItem = (
     reservation: Reservation,
@@ -237,6 +257,155 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
     );
   };
 
+  const createVehicle = (payload: NewVehiclePayload): ActionResult => {
+    const requiredFields = [
+      payload.name,
+      payload.code,
+      payload.plate,
+      payload.brand,
+      payload.model,
+      payload.year,
+      payload.currentMileage,
+      payload.location,
+      payload.responsible,
+      payload.description,
+    ];
+
+    if (requiredFields.some((field) => !field.trim())) {
+      return { success: false, message: "Preencha todos os campos obrigatórios do veículo." };
+    }
+
+    if (resources.some((item) => item.code.toLowerCase() === payload.code.trim().toLowerCase())) {
+      return { success: false, message: "Já existe um veículo com esse código." };
+    }
+
+    if (resources.some((item) => item.plate?.toLowerCase() === payload.plate.trim().toLowerCase())) {
+      return { success: false, message: "Já existe um veículo com essa placa." };
+    }
+
+    const vehicleCount = resources.filter((item) => item.category === "Veiculo").length + 1;
+    const normalizedCode = payload.code.trim().toUpperCase();
+    const normalizedPlate = payload.plate.trim().toUpperCase();
+    const normalizedBrand = payload.brand.trim();
+    const normalizedMileage = payload.currentMileage.trim();
+    const resource: Resource = {
+      id: `res-${Date.now()}`,
+      vehicleId: `VEH-${String(vehicleCount).padStart(3, "0")}`,
+      name: payload.name.trim(),
+      code: normalizedCode,
+      category: "Veiculo",
+      status: "Disponivel",
+      plate: normalizedPlate,
+      model: payload.model.trim(),
+      brand: normalizedBrand,
+      year: payload.year.trim(),
+      rentalCompany: payload.rentalCompany?.trim() || "Cadastro interno",
+      vehicleCategory: payload.vehicleCategory,
+      currentMileage: normalizedMileage,
+      lastInspectionDate: new Date().toISOString(),
+      vehicleDocumentAttachment: payload.vehicleDocumentAttachment?.trim() || "",
+      vehiclePhotoAttachments: [],
+      lastMaintenanceDate: new Date().toISOString(),
+      nextMaintenanceDate: payload.nextMaintenanceDate?.trim() || undefined,
+      lastMaintenanceMileage: normalizedMileage,
+      nextMaintenanceMileage: payload.nextMaintenanceMileage?.trim() || undefined,
+      observation: payload.observation?.trim() || undefined,
+      location: payload.location.trim(),
+      capacity: "5 lugares",
+      description: payload.description.trim(),
+      responsible: payload.responsible.trim(),
+      requiresApproval: payload.requiresApproval ?? true,
+      imageHint: payload.vehicleCategory.toLowerCase(),
+      tags: [payload.vehicleCategory, normalizedBrand].filter(Boolean),
+    };
+
+    setResources((current) => [resource, ...current]);
+
+    return {
+      success: true,
+      message: `Veículo ${resource.code} cadastrado com sucesso.`,
+      resource,
+    };
+  };
+
+  const createUser = (payload: NewUserPayload): ActionResult => {
+    const requiredFields = [
+      payload.name,
+      payload.fullName,
+      payload.cpf,
+      payload.matricula,
+      payload.areaDepartamento,
+      payload.centroCusto,
+      payload.emailCorporativo,
+      payload.telefone,
+      payload.cnhNumero,
+      payload.cnhCategoria,
+      payload.cnhUfEmissao,
+    ];
+
+    if (requiredFields.some((field) => !field.trim())) {
+      return { success: false, message: "Preencha todos os campos obrigatórios do usuário." };
+    }
+
+    if (
+      usersData.some(
+        (item) => item.matricula.toLowerCase() === payload.matricula.trim().toLowerCase()
+      )
+    ) {
+      return { success: false, message: "Já existe um usuário com essa matrícula." };
+    }
+
+    if (
+      usersData.some(
+        (item) =>
+          item.emailCorporativo.toLowerCase() === payload.emailCorporativo.trim().toLowerCase()
+      )
+    ) {
+      return { success: false, message: "Já existe um usuário com esse e-mail corporativo." };
+    }
+
+    if (usersData.some((item) => item.cpf === payload.cpf.trim())) {
+      return { success: false, message: "Já existe um usuário com esse CPF." };
+    }
+
+    const generatedId = `usr-${Date.now()}`;
+    const corporateEmail = payload.emailCorporativo.trim().toLowerCase();
+    const user: User = {
+      id: generatedId,
+      userId: generatedId,
+      name: payload.name.trim(),
+      fullName: payload.fullName.trim(),
+      cpf: payload.cpf.trim(),
+      gestorVeiculo: payload.role !== "Solicitante",
+      matricula: payload.matricula.trim().toUpperCase(),
+      matriz: payload.matriz?.trim() || currentUser?.matriz || "Belo Horizonte",
+      role: payload.role,
+      area: payload.areaDepartamento.trim(),
+      areaDepartamento: payload.areaDepartamento.trim(),
+      centroCusto: payload.centroCusto.trim().toUpperCase(),
+      email: corporateEmail,
+      emailCorporativo: corporateEmail,
+      telefone: payload.telefone.trim(),
+      gestorId: payload.gestorId?.trim() || currentUser?.gestorId || currentUser?.id,
+      cnhNumero: payload.cnhNumero.trim().toUpperCase(),
+      cnhCategoria: payload.cnhCategoria.trim().toUpperCase(),
+      cnhUfEmissao: payload.cnhUfEmissao.trim().toUpperCase(),
+      cnhStatus: payload.cnhStatus,
+      cnhDataUltimaValidacao: new Date().toISOString(),
+      cnhAnexo: payload.cnhAnexo?.trim() || "",
+      termosPaytrack: true,
+      observacao: payload.observacao?.trim() || undefined,
+    };
+
+    setUsersData((current) => [user, ...current]);
+
+    return {
+      success: true,
+      message: `Usuário ${user.fullName} cadastrado com sucesso.`,
+      user,
+    };
+  };
+
   const createReservation = (payload: NewReservationPayload): ActionResult => {
     if (
       !payload.resourceId ||
@@ -301,7 +470,7 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
     const sequence = reservations.length + 35;
     const reservation: Reservation = {
       id: `rsv-${Date.now()}`,
-      code: `RSV-${new Date().getFullYear()}-${String(sequence).padStart(3, "0")}`,
+      code: `RSe-${new Date().getFullYear()}-${String(sequence).padStart(3, "0")}`,
       resourceId: payload.resourceId,
       userId: currentUserId,
       title: `Reserva ${resource.name}`,
@@ -470,7 +639,7 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       checkInData: inspection,
       history: appendHistoryItem(
         reservation,
-        "Vistoria de saída concluída",
+        "eistoria de saída concluída",
         payload.notes || `Km ${payload.mileage} | Combustível ${payload.fuelLevel}`
       ),
     };
@@ -536,19 +705,41 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
     };
   };
 
+  const exportReservationsReport = async (): Promise<ActionResult> => {
+    try {
+      const filename = `reservas-sigma-${new Date().toISOString().slice(0, 10)}.csv`;
+      const csv = buildReservationsCsv(reservations, resources, usersData);
+      const result = await downloadCsvForExcel(filename, csv);
+
+      return {
+        success: true,
+        message: result.message,
+        fileUri: result.fileUri,
+      };
+    } catch {
+      return {
+        success: false,
+        message: "Não foi possível gerar o arquivo de reservas.",
+      };
+    }
+  };
+
   const value = useMemo(
     () => ({
       resources,
       reservations,
-      users,
+      users: usersData,
       currentUser,
       currentUserId,
       currentUserName,
       toggleResourceMaintenance,
+      createVehicle,
+      createUser,
       createReservation,
       cancelReservation,
       checkInReservation,
       checkOutReservation,
+      exportReservationsReport,
       getResourceStatus,
       getReservationsForResource,
       getReservationsForDay,
@@ -556,7 +747,7 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       getActionableReservations,
       getSummary,
     }),
-    [currentUser, currentUserName, reservations, resources]
+    [currentUser, currentUserName, reservations, resources, usersData]
   );
 
   return (
@@ -575,3 +766,9 @@ export function useReservationStore() {
 
   return context;
 }
+
+
+
+
+
+

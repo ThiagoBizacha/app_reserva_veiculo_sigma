@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+﻿import { router } from "expo-router";
 import { useState } from "react";
 import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
@@ -327,3 +327,5 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
   },
 });
+
+

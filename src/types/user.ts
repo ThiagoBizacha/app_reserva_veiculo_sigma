@@ -1,4 +1,26 @@
-export type CnhStatus = "Valida" | "Vencida";
+﻿export type CnhStatus = "Válida" | "Vencida";
+
+export type UserRole = "Solicitante" | "Gestor" | "Operação" | "Administrador";
+
+export interface NewUserPayload {
+  name: string;
+  fullName: string;
+  cpf: string;
+  matricula: string;
+  role: UserRole;
+  areaDepartamento: string;
+  centroCusto: string;
+  emailCorporativo: string;
+  telefone: string;
+  cnhNumero: string;
+  cnhCategoria: string;
+  cnhUfEmissao: string;
+  cnhStatus: CnhStatus;
+  matriz?: string;
+  gestorId?: string;
+  cnhAnexo?: string;
+  observacao?: string;
+}
 
 export interface User {
   id: string;
@@ -9,7 +31,7 @@ export interface User {
   gestorVeiculo: boolean;
   matricula: string;
   matriz: string;
-  role: "Solicitante" | "Gestor" | "Operacao" | "Administrador";
+  role: UserRole;
   area: string;
   areaDepartamento: string;
   centroCusto: string;
@@ -26,3 +48,4 @@ export interface User {
   termosPaytrack: boolean;
   observacao?: string;
 }
+

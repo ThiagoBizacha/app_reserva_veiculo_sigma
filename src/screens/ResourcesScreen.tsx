@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+﻿import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -6,7 +6,7 @@ import { ExitHeaderButton, ScreenContainer, VehicleDocumentPreviewModal } from "
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import { formatDate, isWithinRange } from "@/utils/date";
-import { getNextReservation } from "@/utils/reservations";
+import { getNextReservation, getResourceStatusLabel } from "@/utils/reservations";
 import type { Resource, ResourceStatus } from "@/types";
 
 type FleetFilter = "Todos" | "Disponivel" | "Reservado" | "Em uso" | "Manutencao";
@@ -174,14 +174,14 @@ export function ResourcesScreen() {
                 style={[styles.statusPill, { backgroundColor: statusMeta[computedStatus].color }]}
               >
                 <Text style={styles.statusPillText}>
-                  {computedStatus === "Manutencao" ? "Manutenção" : computedStatus}
+                  {getResourceStatusLabel(computedStatus)}
                 </Text>
               </View>
             </View>
 
             <View style={styles.metaGrid}>
               <Text style={styles.metaText}>
-                Placa: {resource.plate ?? "-"} | Codigo: {resource.code}
+                Placa: {resource.plate ?? "-"} | Código: {resource.code}
               </Text>
               <Text style={styles.metaText}>
                 {resource.brand ?? "-"} {resource.model ?? ""} | {resource.year ?? "-"} | {resource.vehicleCategory ?? "-"}
@@ -211,7 +211,7 @@ export function ResourcesScreen() {
               ) : null}
               {resource.nextMaintenanceDate ? (
                 <Text style={styles.metaText}>
-                  Proxima manutencao: {formatDate(resource.nextMaintenanceDate)} | Km {resource.nextMaintenanceMileage ?? "-"}
+                  Próxima manutenção: {formatDate(resource.nextMaintenanceDate)} | Km {resource.nextMaintenanceMileage ?? "-"}
                 </Text>
               ) : null}
               <Text style={styles.metaText}>Responsável: {resource.responsible}</Text>
@@ -436,3 +436,5 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
 });
+
+

@@ -22,6 +22,7 @@ export default function TabsLayout() {
             agenda: "calendar",
             reservations: "bookmark",
             resources: "truck",
+            settings: "settings",
             "check-flow": "check-square",
             admin: "settings",
           };
@@ -35,6 +36,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="reservations" options={{ title: "Reservas" }} />
       <Tabs.Screen name="reservation" options={{ href: null }} />
       <Tabs.Screen name="resources" options={{ title: "Frota" }} />
+      <Tabs.Screen name="settings" options={{ title: "Config." }} />
       <Tabs.Screen name="check-flow" options={{ href: null }} />
       <Tabs.Screen name="admin" options={{ href: null }} />
     </Tabs>

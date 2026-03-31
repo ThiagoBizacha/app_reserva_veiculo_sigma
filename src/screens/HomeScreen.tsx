@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { DriverLicensePreviewModal, ExitHeaderButton, ScreenContainer } from "@/components";
@@ -10,7 +10,7 @@ import { formatDateTime } from "@/utils/date";
 import type { User } from "@/types";
 
 export function HomeScreen() {
-  const { currentUser, currentUserName, reservations, users, getActionableReservations, getSummary } =
+  const { currentUser, currentUserName, reservations, getActionableReservations, getSummary } =
     useReservationStore();
   const [licenseUser, setLicenseUser] = useState<User | null>(null);
   const summary = getSummary();
@@ -20,20 +20,27 @@ export function HomeScreen() {
       reservation.userId === currentUser.id &&
       ["Pendente", "Aprovada", "Em uso", "Em atraso"].includes(reservation.status)
   ).length;
-  const managerName =
-    users.find((user) => user.id === currentUser.gestorId)?.fullName ?? "Sem gestor definido";
+  const requesterDepartment = "Tecnologia da Informação";
+  const requesterCostCenter = "IT1000";
+  const requesterManagerName = "André Mello";
+  const normalizedCnhStatus = currentUser.cnhStatus
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const isLicenseValid = normalizedCnhStatus === "valida";
+  const cnhStatusLabel = isLicenseValid ? "CNH válida" : "CNH vencida";
 
   const shortcuts = [
     {
       title: "Minhas reservas",
-      description: "Acompanhe reservas e inicie a operacao quando necessario.",
+      description: "Acompanhe reservas e inicie a operação quando necessário.",
       icon: "bookmark",
       route: "/(tabs)/reservations",
       badge: myOpenReservations > 0 ? `${myOpenReservations} ativas` : undefined,
     },
     {
       title: "Frota",
-      description: "Consulte disponibilidade, cadastro resumido e agenda dos veiculos.",
+      description: "Consulte disponibilidade, cadastro resumido e agenda dos veículos.",
       icon: "truck",
       route: "/(tabs)/resources",
       badge: `${summary.available} livres`,
@@ -64,9 +71,9 @@ export function HomeScreen() {
         </View>
 
         <View style={styles.headerCopy}>
-          <Text style={styles.headerTitle}>Reserva de Veiculos</Text>
+          <Text style={styles.headerTitle}>Reserva de Veículos</Text>
           <Text style={styles.headerSubtitle}>
-            Entre pela agenda para escolher o veiculo e reservar com menos passos.
+            Entre pela agenda para escolher o veículo e reservar com menos passos.
           </Text>
         </View>
       </LinearGradient>
@@ -77,43 +84,49 @@ export function HomeScreen() {
             <View style={styles.profileCopy}>
               <Text style={styles.profileName}>{currentUser.fullName}</Text>
               <Text style={styles.profileMeta}>
-                {currentUser.matricula} | {currentUser.areaDepartamento}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.cnhBadge,
-                currentUser.cnhStatus === "Valida" ? styles.cnhBadgeValid : styles.cnhBadgeExpired,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.cnhBadgeText,
-                  currentUser.cnhStatus === "Valida"
-                    ? styles.cnhBadgeTextValid
-                    : styles.cnhBadgeTextExpired,
-                ]}
-              >
-                CNH {currentUser.cnhStatus}
+                {currentUser.matricula} | {requesterDepartment}
               </Text>
             </View>
           </View>
+
           <Text style={styles.profileMeta}>
-            Centro de custo {currentUser.centroCusto} | Gestor {managerName}
+            Centro de Custo: {requesterCostCenter} | Gestor: {requesterManagerName}
           </Text>
+
           <View style={styles.licenseCard}>
             <View style={styles.licenseCopy}>
-              <View style={styles.licenseTitleRow}>
-                <Feather name="credit-card" size={16} color={colors.primaryDark} />
-                <Text style={styles.licenseTitle}>CNH digital</Text>
+              <View style={styles.licenseHeaderRow}>
+                <View style={styles.licenseTitleRow}>
+                  <Feather name="credit-card" size={16} color={colors.primaryDark} />
+                  <Text style={styles.licenseTitle}>CNH digital</Text>
+                </View>
+                <View
+                  style={[
+                    styles.licenseStatusBadge,
+                    isLicenseValid ? styles.licenseStatusBadgeValid : styles.licenseStatusBadgeExpired,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.licenseStatusBadgeText,
+                      isLicenseValid
+                        ? styles.licenseStatusBadgeTextValid
+                        : styles.licenseStatusBadgeTextExpired,
+                    ]}
+                  >
+                    {cnhStatusLabel}
+                  </Text>
+                </View>
               </View>
+
               <Text style={styles.licenseMeta}>
-                Categoria {currentUser.cnhCategoria} | Emissao {currentUser.cnhUfEmissao}
+                Categoria {currentUser.cnhCategoria} | Emissão {currentUser.cnhUfEmissao}
               </Text>
               <Text style={styles.licenseMeta}>
-                Ultima validacao {formatDateTime(currentUser.cnhDataUltimaValidacao)}
+                Última validação {formatDateTime(currentUser.cnhDataUltimaValidacao)}
               </Text>
             </View>
+
             <Pressable
               style={[
                 styles.licenseAction,
@@ -136,16 +149,16 @@ export function HomeScreen() {
 
         <View style={styles.summaryRow}>
           <SummaryCard label="Reservas ativas" value={myOpenReservations} />
-          <SummaryCard label="Veiculos livres" value={summary.available} />
-          <SummaryCard label="Operacoes" value={actionableReservations.length} />
+          <SummaryCard label="Veículos livres" value={summary.available} />
+          <SummaryCard label="Operações" value={actionableReservations.length} />
         </View>
 
         <Pressable style={styles.primaryCard} onPress={() => router.push("/(tabs)/agenda")}>
           <View style={styles.primaryCardCopy}>
             <Text style={styles.primaryEyebrow}>Fluxo principal</Text>
-            <Text style={styles.primaryTitle}>Reservar veiculo</Text>
+            <Text style={styles.primaryTitle}>Reservar veículo</Text>
             <Text style={styles.primaryDescription}>
-              Escolha o dia no calendario e siga para a reserva ja com contexto preenchido.
+              Escolha o dia no calendário e siga para a reserva já com contexto preenchido.
             </Text>
           </View>
           <View style={styles.primaryIcon}>
@@ -293,27 +306,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: typography.caption,
   },
-  cnhBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-  },
-  cnhBadgeValid: {
-    backgroundColor: colors.primarySoft,
-  },
-  cnhBadgeExpired: {
-    backgroundColor: `${colors.danger}12`,
-  },
-  cnhBadgeText: {
-    fontSize: typography.caption,
-    fontWeight: "700",
-  },
-  cnhBadgeTextValid: {
-    color: colors.primaryDark,
-  },
-  cnhBadgeTextExpired: {
-    color: colors.danger,
-  },
   licenseCard: {
     marginTop: spacing.xs,
     borderRadius: radius.lg,
@@ -324,29 +316,59 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   licenseCopy: {
     flex: 1,
     gap: spacing.xxs,
   },
+  licenseHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    marginBottom: 2,
+  },
   licenseTitleRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
+    flexShrink: 1,
   },
   licenseTitle: {
     color: colors.primaryDark,
     fontSize: typography.bodySmall,
     fontWeight: "700",
   },
+  licenseStatusBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    flexShrink: 0,
+  },
+  licenseStatusBadgeValid: {
+    backgroundColor: colors.primarySoft,
+  },
+  licenseStatusBadgeExpired: {
+    backgroundColor: `${colors.danger}12`,
+  },
+  licenseStatusBadgeText: {
+    fontSize: typography.caption,
+    fontWeight: "700",
+  },
+  licenseStatusBadgeTextValid: {
+    color: colors.primaryDark,
+  },
+  licenseStatusBadgeTextExpired: {
+    color: colors.danger,
+  },
   licenseMeta: {
     color: colors.textSecondary,
     fontSize: typography.caption,
   },
   licenseAction: {
-    minWidth: 88,
-    minHeight: 40,
+    minWidth: 96,
+    minHeight: 42,
     borderRadius: radius.md,
     backgroundColor: colors.primaryDark,
     alignItems: "center",

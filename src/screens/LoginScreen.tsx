@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+﻿import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -86,14 +86,14 @@ export function LoginScreen() {
 
             <View style={styles.card}>
               <Text style={styles.title}>Bem-vindo</Text>
-              <Text style={styles.subtitle}>Faca login para continuar</Text>
+              <Text style={styles.subtitle}>Faça login para continuar</Text>
 
               <View style={styles.formBlock}>
                 <View style={styles.labelBlock}>
-                  <Text style={styles.label}>Usuario</Text>
+                  <Text style={styles.label}>Usuário</Text>
                   <LoginField
                     icon="user"
-                    placeholder="Digite seu usuario"
+                    placeholder="Digite seu usuário"
                     value={username}
                     onChangeText={setUsername}
                   />
@@ -325,3 +325,4 @@ const styles = StyleSheet.create({
     fontSize: typography.bodySmall,
   },
 });
+

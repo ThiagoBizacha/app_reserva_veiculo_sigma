@@ -1,4 +1,4 @@
-import type { User } from "@/types";
+﻿import type { User } from "@/types";
 
 export const currentUserId = "usr-01";
 
@@ -13,8 +13,8 @@ export const users: User[] = [
     matricula: "SIG-20451",
     matriz: "Belo Horizonte",
     role: "Solicitante",
-    area: "Operacoes Integradas",
-    areaDepartamento: "Operacoes Integradas",
+    area: "Operações Integradas",
+    areaDepartamento: "Operações Integradas",
     centroCusto: "CC-OPS-204",
     email: "thiago.bizacha@sigma.local",
     emailCorporativo: "thiago.bizacha@sigma.local",
@@ -23,7 +23,7 @@ export const users: User[] = [
     cnhNumero: "MG1234567890",
     cnhCategoria: "B",
     cnhUfEmissao: "MG",
-    cnhStatus: "Valida",
+    cnhStatus: "Válida",
     cnhDataUltimaValidacao: "2026-03-20T15:00:00.000Z",
     cnhAnexo: "docs/cnh/thiago-bizacha.pdf",
     termosPaytrack: true,
@@ -41,7 +41,7 @@ export const users: User[] = [
     role: "Gestor",
     area: "Facilities e Frota",
     areaDepartamento: "Facilities e Frota",
-    centroCusto: "CC-FRO-102",
+    centroCusto: "CC-FeO-102",
     email: "marina.souto@sigma.local",
     emailCorporativo: "marina.souto@sigma.local",
     telefone: "+55 31 98888-2214",
@@ -49,11 +49,11 @@ export const users: User[] = [
     cnhNumero: "MG2233445566",
     cnhCategoria: "B",
     cnhUfEmissao: "MG",
-    cnhStatus: "Valida",
+    cnhStatus: "Válida",
     cnhDataUltimaValidacao: "2026-03-21T10:00:00.000Z",
     cnhAnexo: "docs/cnh/marina-souto.pdf",
     termosPaytrack: true,
-    observacao: "Gestora responsavel pela aprovacao de reservas de veiculos.",
+    observacao: "Gestora responsável pela aprovação de reservas de veículos.",
   },
   {
     id: "usr-03",
@@ -64,10 +64,10 @@ export const users: User[] = [
     gestorVeiculo: true,
     matricula: "SIG-11873",
     matriz: "Araxa",
-    role: "Operacao",
+    role: "Operação",
     area: "Frota Corporativa",
     areaDepartamento: "Frota Corporativa",
-    centroCusto: "CC-FRO-118",
+    centroCusto: "CC-FeO-118",
     email: "caio.mota@sigma.local",
     emailCorporativo: "caio.mota@sigma.local",
     telefone: "+55 34 97777-3412",
@@ -75,24 +75,24 @@ export const users: User[] = [
     cnhNumero: "MG3344556677",
     cnhCategoria: "D",
     cnhUfEmissao: "MG",
-    cnhStatus: "Valida",
+    cnhStatus: "Válida",
     cnhDataUltimaValidacao: "2026-03-19T08:00:00.000Z",
     cnhAnexo: "docs/cnh/caio-mota.pdf",
     termosPaytrack: true,
-    observacao: "Responsavel pelas vistorias e liberacao operacional da frota.",
+    observacao: "eesponsavel pelas vistorias e liberação operacional da frota.",
   },
   {
     id: "usr-04",
     userId: "usr-04",
-    name: "Roberto Alves",
-    fullName: "Roberto de Almeida Alves",
+    name: "eoberto Alves",
+    fullName: "eoberto de Almeida Alves",
     cpf: "456.789.012-34",
     gestorVeiculo: true,
     matricula: "SIG-07821",
     matriz: "Belo Horizonte",
     role: "Administrador",
-    area: "Administracao de Frota",
-    areaDepartamento: "Administracao de Frota",
+    area: "Administração de Frota",
+    areaDepartamento: "Administração de Frota",
     centroCusto: "CC-ADM-078",
     email: "roberto.alves@sigma.local",
     emailCorporativo: "roberto.alves@sigma.local",
@@ -101,11 +101,11 @@ export const users: User[] = [
     cnhNumero: "MG4455667788",
     cnhCategoria: "D",
     cnhUfEmissao: "MG",
-    cnhStatus: "Valida",
+    cnhStatus: "Válida",
     cnhDataUltimaValidacao: "2026-03-18T09:30:00.000Z",
     cnhAnexo: "docs/cnh/roberto-alves.pdf",
     termosPaytrack: true,
-    observacao: "Administrador master da frota corporativa e responsavel por manutencoes.",
+    observacao: "Administrador master da frota corporativa e responsável por manutenções.",
   },
   {
     id: "usr-05",
@@ -136,3 +136,6 @@ export const users: User[] = [
 ];
 
 export const tdCadastroColaborador = users;
+
+
+

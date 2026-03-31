@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+﻿import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -9,12 +9,12 @@ import { formatDateTime } from "@/utils/date";
 import { getResourceById } from "@/utils/reservations";
 import type { ReservationStatus } from "@/types";
 
-type ReservationFilter = "Ativas" | "Em uso" | "Concluidas" | "Canceladas";
+type ReservationFilter = "Ativas" | "Em uso" | "Concluídas" | "Canceladas";
 
 const filterMap: Record<ReservationFilter, ReservationStatus[]> = {
   Ativas: ["Pendente", "Aprovada"],
   "Em uso": ["Em uso", "Em atraso"],
-  Concluidas: ["Concluida"],
+  Concluídas: ["Concluida"],
   Canceladas: ["Cancelada"],
 };
 
@@ -40,7 +40,7 @@ export function MyReservationsScreen() {
   const counts = {
     Ativas: myReservations.filter((reservation) => filterMap.Ativas.includes(reservation.status)).length,
     "Em uso": myReservations.filter((reservation) => filterMap["Em uso"].includes(reservation.status)).length,
-    Concluidas: myReservations.filter((reservation) => filterMap.Concluidas.includes(reservation.status)).length,
+    Concluídas: myReservations.filter((reservation) => filterMap.Concluídas.includes(reservation.status)).length,
     Canceladas: myReservations.filter((reservation) => filterMap.Canceladas.includes(reservation.status)).length,
   };
 
@@ -82,7 +82,7 @@ export function MyReservationsScreen() {
           <View style={styles.headerCopy}>
             <Text style={styles.headerTitle}>Minhas Reservas</Text>
             <Text style={styles.headerSubtitle}>
-              Acompanhe o status e execute a proxima acao sem trocar de fluxo.
+              Acompanhe o status e execute a próxima ação sem trocar de fluxo.
             </Text>
             <Text style={styles.headerUser}>{currentUser.fullName}</Text>
           </View>
@@ -91,7 +91,7 @@ export function MyReservationsScreen() {
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterTabs}>
-        {(["Ativas", "Em uso", "Concluidas", "Canceladas"] as ReservationFilter[]).map((item) => {
+        {(["Ativas", "Em uso", "Concluídas", "Canceladas"] as ReservationFilter[]).map((item) => {
           const active = item === filter;
 
           return (
@@ -132,9 +132,9 @@ export function MyReservationsScreen() {
               reservation.status === "Pendente"
                 ? "Cancelar reserva"
                 : reservation.status === "Aprovada"
-                  ? "Iniciar vistoria de saida"
+                  ? "Iniciar vistoria de saída"
                   : reservation.status === "Em uso"
-                    ? "Registrar devolucao"
+                    ? "Registrar devolução"
                     : undefined;
 
             return (
@@ -155,7 +155,7 @@ export function MyReservationsScreen() {
                   text={`${formatDateTime(reservation.startDate)} -> ${formatDateTime(reservation.endDate)}`}
                 />
                 {reservation.plannedDurationHours ? (
-                  <InfoRow icon="clock" text={`Duracao planejada: ${reservation.plannedDurationHours}h`} />
+                  <InfoRow icon="clock" text={`Duração planejada: ${reservation.plannedDurationHours}h`} />
                 ) : null}
                 <InfoRow icon="map-pin" text={reservation.base} />
                 <InfoRow icon="briefcase" text={reservation.purpose} />
@@ -388,3 +388,4 @@ const styles = StyleSheet.create({
     ...shadows.card,
   },
 });
+

@@ -1,4 +1,4 @@
-import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
+﻿import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo, useState, type ReactNode } from "react";
@@ -122,24 +122,24 @@ export function NewReservationScreen({
         <Pressable onPress={() => router.back()}>
           <Feather name="arrow-left" size={24} color={colors.white} />
         </Pressable>
-        <Text style={styles.headerTitle}>Reserva de Veiculo</Text>
+        <Text style={styles.headerTitle}>Reserva de Veículo</Text>
         <ExitHeaderButton variant="light" compact />
       </View>
 
       <View style={styles.heroCard}>
         <Text style={styles.heroTitle}>Nova Reserva</Text>
         <Text style={styles.heroSubtitle}>
-          Escolha o horario de retirada e a duracao de uso. Cada reserva pode ter no minimo 1h e
-          no maximo 4h no mesmo dia.
+          Escolha o horário de retirada e a duração de uso. Cada reserva pode ter no mínimo 1h e
+          no máximo 4h no mesmo dia.
         </Text>
       </View>
 
-      <Section title="Veiculo">
+      <Section title="Veículo">
         <Pressable style={styles.selector} onPress={() => setShowResourceModal(true)}>
           <Text style={[styles.selectorText, !selectedResource && styles.selectorPlaceholder]}>
             {selectedResource
               ? `${selectedResource.plate ?? selectedResource.code} | ${selectedResource.brand ?? ""} ${selectedResource.model ?? selectedResource.name}`
-              : "Selecionar veiculo"}
+              : "Selecionar veículo"}
           </Text>
           <Feather name="chevron-down" size={18} color={colors.textMuted} />
         </Pressable>
@@ -195,10 +195,10 @@ export function NewReservationScreen({
         </View>
 
         <View style={styles.periodSummary}>
-          <Text style={styles.periodSummaryTitle}>Previsao de uso</Text>
+          <Text style={styles.periodSummaryTitle}>Previsão de uso</Text>
           <Text style={styles.periodSummaryText}>Retirada: {formatDateTime(startDate)}</Text>
-          <Text style={styles.periodSummaryText}>Previsao de devolucao: {formatDateTime(endDate)}</Text>
-          <Text style={styles.periodSummaryText}>Duracao planejada: {durationHours} hora(s)</Text>
+          <Text style={styles.periodSummaryText}>Previsão de devolução: {formatDateTime(endDate)}</Text>
+          <Text style={styles.periodSummaryText}>Duração planejada: {durationHours} hora(s)</Text>
         </View>
       </Section>
 
@@ -217,20 +217,20 @@ export function NewReservationScreen({
           editable={false}
         />
         <Field
-          label="Observacoes"
+          label="Observações"
           value={notes}
           onChangeText={setNotes}
-          placeholder="Detalhes adicionais, passageiros e instrucoes."
+          placeholder="Detalhes adicionais, passageiros e instruções."
           multiline
         />
       </Section>
 
-      <Section title="Bloqueios por Horario">
+      <Section title="Bloqueios por Horário">
         {conflicts.length === 0 ? (
           <View style={styles.freeState}>
             <Feather name="check-circle" size={18} color={colors.success} />
             <Text style={styles.freeStateText}>
-              Nao ha bloqueio neste horario. O sistema preve devolucao em {formatDateTime(endDate)}.
+              Não há bloqueio neste horário. O sistema prevê devolução em {formatDateTime(endDate)}.
             </Text>
           </View>
         ) : (
@@ -280,7 +280,7 @@ export function NewReservationScreen({
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Selecionar veiculo</Text>
+            <Text style={styles.modalTitle}>Selecionar veículo</Text>
             <View style={styles.modalList}>
               {vehicleOptions.map((resource) => {
                 const optionStatus = getResourceStatus(resource.id, new Date(startDate));
@@ -667,3 +667,5 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
+
+

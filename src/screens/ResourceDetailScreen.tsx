@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+﻿import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
@@ -29,8 +29,8 @@ export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) 
       <ScreenContainer>
         <EmptyState
           icon="alert-circle"
-          title="Recurso nao encontrado"
-          description="Nao foi possivel localizar o veiculo solicitado."
+          title="Recurso não encontrado"
+          description="Não foi possível localizar o veículo solicitado."
         />
       </ScreenContainer>
     );
@@ -59,7 +59,7 @@ export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) 
           <Text style={styles.description}>{resource.description}</Text>
         </View>
 
-        <MetaBlock label="Cadastro do veiculo">
+        <MetaBlock label="Cadastro do veículo">
           <Text style={styles.metaValue}>
             Placa {resource.plate ?? "-"} | Marca {resource.brand ?? "-"} | Modelo {resource.model ?? "-"}
           </Text>
@@ -70,22 +70,22 @@ export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) 
           <Text style={styles.metaValue}>Km atual {resource.currentMileage ?? "-"}</Text>
         </MetaBlock>
 
-        <MetaBlock label="Operacao">
-          <Text style={styles.metaValue}>Responsavel {resource.responsible}</Text>
+        <MetaBlock label="Operação">
+          <Text style={styles.metaValue}>Responsável {resource.responsible}</Text>
           <Text style={styles.metaValue}>Base {resource.location}</Text>
           {resource.observation ? <Text style={styles.metaValue}>{resource.observation}</Text> : null}
         </MetaBlock>
 
-        <MetaBlock label="Vistoria e manutencao">
+        <MetaBlock label="Vistoria e manutenção">
           <Text style={styles.metaValue}>
-            Ultima vistoria {resource.lastInspectionDate ? formatDateTime(resource.lastInspectionDate) : "-"}
+            Última vistoria {resource.lastInspectionDate ? formatDateTime(resource.lastInspectionDate) : "-"}
           </Text>
           <Text style={styles.metaValue}>
-            Ultima manutencao {resource.lastMaintenanceDate ? formatDateTime(resource.lastMaintenanceDate) : "-"} | Km{" "}
+            Última manutenção {resource.lastMaintenanceDate ? formatDateTime(resource.lastMaintenanceDate) : "-"} | Km{" "}
             {resource.lastMaintenanceMileage ?? "-"}
           </Text>
           <Text style={styles.metaValue}>
-            Proxima manutencao {resource.nextMaintenanceDate ? formatDateTime(resource.nextMaintenanceDate) : "-"} | Km{" "}
+            Próxima manutenção {resource.nextMaintenanceDate ? formatDateTime(resource.nextMaintenanceDate) : "-"} | Km{" "}
             {resource.nextMaintenanceMileage ?? "-"}
           </Text>
         </MetaBlock>
@@ -98,9 +98,9 @@ export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) 
         </MetaBlock>
 
         {nextReservation ? (
-          <MetaBlock label="Proxima reserva">
+          <MetaBlock label="Próxima reserva">
             <Text style={styles.metaValue}>
-              {formatDateTime(nextReservation.startDate)} ate {formatDateTime(nextReservation.endDate)}
+              {formatDateTime(nextReservation.startDate)} até {formatDateTime(nextReservation.endDate)}
             </Text>
           </MetaBlock>
         ) : null}
@@ -115,13 +115,13 @@ export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) 
       </Card>
 
       <PrimaryButton
-        label="Ver agenda do veiculo"
+        label="Ver agenda do veículo"
         onPress={() =>
           router.push({ pathname: "/(tabs)/agenda", params: { resourceId: resource.id } })
         }
       />
       <PrimaryButton
-        label="Reservar este veiculo"
+        label="Reservar este veículo"
         onPress={() =>
           router.push({ pathname: "/reservation/new", params: { resourceId: resource.id } })
         }
@@ -202,3 +202,5 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
 });
+
+

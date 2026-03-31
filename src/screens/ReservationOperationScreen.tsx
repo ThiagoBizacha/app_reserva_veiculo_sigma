@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+﻿import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { type ReactNode, useMemo, useState } from "react";
@@ -380,7 +380,7 @@ export function ReservationOperationScreen({
       <View style={styles.vehicleBannerCopy}>
         <Text style={styles.vehicleBannerTitle}>{resource.name}</Text>
         <Text style={styles.vehicleBannerMeta}>
-          {resource.plate ?? resource.code} | {resource.brand ?? "-"} {resource.model ?? ""} | Saida {formatDateTime(reservation.startDate)}
+          {resource.plate ?? resource.code} | {resource.brand ?? "-"} {resource.model ?? ""} | Saída {formatDateTime(reservation.startDate)}
         </Text>
         <Text style={styles.vehicleBannerMeta}>
           {resolvedMode === "checkin"
@@ -1233,3 +1233,5 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
+
+

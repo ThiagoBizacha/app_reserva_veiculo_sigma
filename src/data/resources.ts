@@ -1,4 +1,4 @@
-import type { Resource } from "@/types";
+﻿import type { Resource } from "@/types";
 
 export const resources: Resource[] = [
   {
@@ -59,15 +59,15 @@ export const resources: Resource[] = [
     nextMaintenanceDate: "2026-05-28T08:00:00.000Z",
     lastMaintenanceMileage: "9.110",
     nextMaintenanceMileage: "20.000",
-    observation: "Pickup alocada para operacoes de campo e transporte leve.",
+    observation: "Pickup alocada para operações de campo e transporte leve.",
     location: "Base Operacional - Campinas",
     capacity: "5 lugares",
-    description: "Pickup para operacao em campo, visitas tecnicas e apoio logistico.",
+    description: "Pickup para operação em campo, visitas técnicas e apoio logístico.",
     responsible: "Caio Mota",
     requiresApproval: true,
     imageHint: "pickup",
     nextAvailableAt: "2026-03-29T18:00:00.000Z",
-    tags: ["Pickup", "Operacao", "Movida"],
+    tags: ["Pickup", "Operação", "Movida"],
   },
   {
     id: "res-03",
@@ -130,12 +130,12 @@ export const resources: Resource[] = [
     observation: "Reserva tecnica para viagens operacionais na regiao metropolitana.",
     location: "Contagem",
     capacity: "5 lugares",
-    description: "SUV compartilhado para operacoes regionais e deslocamentos administrativos.",
+    description: "SUV compartilhado para operações regionais e deslocamentos administrativos.",
     responsible: "Roberto Alves",
     requiresApproval: true,
     imageHint: "suv",
     nextAvailableAt: "2026-03-27T08:00:00.000Z",
-    tags: ["SUV", "Operacao", "Movida"],
+    tags: ["SUV", "Operação", "Movida"],
   },
   {
     id: "res-05",
@@ -300,7 +300,7 @@ export const resources: Resource[] = [
     observation: "Aguardando substituicao do conjunto de freio dianteiro.",
     location: "Base Matriz - BH",
     capacity: "5 lugares",
-    description: "Pickup 4x4 dedicada a operacoes de campo em rota mista.",
+    description: "Pickup 4x4 dedicada a operações de campo em rota mista.",
     responsible: "Roberto Alves",
     requiresApproval: true,
     imageHint: "pickup",
@@ -331,10 +331,10 @@ export const resources: Resource[] = [
     nextMaintenanceDate: "2026-05-22T08:00:00.000Z",
     lastMaintenanceMileage: "34.000",
     nextMaintenanceMileage: "50.000",
-    observation: "Disponivel para operacao em campo no eixo BH/Araxa.",
+    observation: "Disponível para operação em campo no eixo BH/Araxá.",
     location: "Araxa",
     capacity: "5 lugares",
-    description: "Pickup robusta para inspeções, manutencao e rotas de campo.",
+    description: "Pickup robusta para inspeções, manutenção e rotas de campo.",
     responsible: "Caio Mota",
     requiresApproval: true,
     imageHint: "pickup",
@@ -548,3 +548,7 @@ export const resources: Resource[] = [
 ];
 
 export const tdCadastroVeiculo = resources.filter((resource) => resource.category === "Veiculo");
+
+
+
+

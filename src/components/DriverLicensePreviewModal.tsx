@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+﻿import { Feather } from "@expo/vector-icons";
 import type { ReactNode } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
@@ -18,6 +18,13 @@ export function DriverLicensePreviewModal({
     return null;
   }
 
+  const normalizedCnhStatus = user.cnhStatus
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const isLicenseValid = normalizedCnhStatus === "valida";
+  const cnhStatusLabel = isLicenseValid ? "Válida" : "Vencida";
+
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -26,7 +33,7 @@ export function DriverLicensePreviewModal({
             <View style={styles.headerCopy}>
               <Text style={styles.title}>CNH do colaborador</Text>
               <Text style={styles.subtitle}>
-                Pre-visualizacao do PDF mockado para {user.fullName}
+                Pré-visualização do PDF mockado para {user.fullName}
               </Text>
             </View>
             <Pressable style={styles.closeIconButton} onPress={onClose}>
@@ -38,7 +45,7 @@ export function DriverLicensePreviewModal({
             <View style={styles.infoBanner}>
               <Feather name="file-text" size={18} color={colors.primaryDark} />
               <Text style={styles.infoBannerText}>
-                Arquivo vinculado: {user.cnhAnexo || "Nao informado"}
+                Arquivo vinculado: {user.cnhAnexo || "Não informado"}
               </Text>
             </View>
 
@@ -46,24 +53,22 @@ export function DriverLicensePreviewModal({
               <View style={styles.pageHeader}>
                 <View style={styles.pageHeaderCopy}>
                   <Text style={styles.pageOverline}>CNH DIGITAL</Text>
-                  <Text style={styles.pageTitle}>Carteira Nacional de Habilitacao</Text>
-                  <Text style={styles.pageSubtitle}>Uso interno / visualizacao mockada</Text>
+                  <Text style={styles.pageTitle}>Carteira Nacional de Habilitação</Text>
+                  <Text style={styles.pageSubtitle}>Uso interno / visualização mockada</Text>
                 </View>
                 <View
                   style={[
                     styles.statusBadge,
-                    user.cnhStatus === "Valida" ? styles.statusBadgeValid : styles.statusBadgeExpired,
+                    isLicenseValid ? styles.statusBadgeValid : styles.statusBadgeExpired,
                   ]}
                 >
                   <Text
                     style={[
                       styles.statusBadgeText,
-                      user.cnhStatus === "Valida"
-                        ? styles.statusBadgeTextValid
-                        : styles.statusBadgeTextExpired,
+                      isLicenseValid ? styles.statusBadgeTextValid : styles.statusBadgeTextExpired,
                     ]}
                   >
-                    {user.cnhStatus}
+                    {cnhStatusLabel}
                   </Text>
                 </View>
               </View>
@@ -71,35 +76,35 @@ export function DriverLicensePreviewModal({
               <View style={styles.fieldGrid}>
                 <DocumentField label="Nome" value={user.fullName} />
                 <DocumentField label="CPF" value={user.cpf} />
-                <DocumentField label="Numero da CNH" value={user.cnhNumero} />
+                <DocumentField label="Número da CNH" value={user.cnhNumero} />
                 <DocumentField label="Categoria" value={user.cnhCategoria} />
-                <DocumentField label="UF emissao" value={user.cnhUfEmissao} />
-                <DocumentField label="Matricula" value={user.matricula} />
-                <DocumentField label="Area" value={user.areaDepartamento} />
+                <DocumentField label="UF de emissão" value={user.cnhUfEmissao} />
+                <DocumentField label="Matrícula" value={user.matricula} />
+                <DocumentField label="Área" value={user.areaDepartamento} />
                 <DocumentField label="Centro de custo" value={user.centroCusto} />
                 <DocumentField label="Email" value={user.emailCorporativo} />
                 <DocumentField label="Telefone" value={user.telefone} />
               </View>
 
-              <Section title="Controle de habilitacao">
-                <DocumentField label="Status da CNH" value={user.cnhStatus} />
+              <Section title="Controle de habilitação">
+                <DocumentField label="Status da CNH" value={cnhStatusLabel} />
                 <DocumentField
-                  label="Ultima validacao"
+                  label="Última validação"
                   value={formatDateTime(user.cnhDataUltimaValidacao)}
                 />
                 <DocumentField label="Termos Paytrack" value={user.termosPaytrack ? "Aceito" : "Pendente"} />
                 <DocumentField label="Perfil" value={user.role} />
               </Section>
 
-              <Section title="Observacoes">
+              <Section title="Observações">
                 <Text style={styles.noteText}>
-                  {user.observacao ?? "Sem observacoes adicionais para esta CNH."}
+                  {user.observacao ?? "Sem observações adicionais para esta CNH."}
                 </Text>
               </Section>
 
               <View style={styles.footer}>
                 <Text style={styles.footerText}>
-                  Documento mockado para demonstracao do fluxo de PDF da CNH na home.
+                  Documento mockado para demonstração do fluxo de PDF da CNH na home.
                 </Text>
                 <Text style={styles.footerMeta}>
                   Validado em {formatDateTime(user.cnhDataUltimaValidacao)}
@@ -109,7 +114,7 @@ export function DriverLicensePreviewModal({
           </ScrollView>
 
           <Pressable style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeButtonText}>Fechar visualizacao</Text>
+            <Text style={styles.closeButtonText}>Fechar visualização</Text>
           </Pressable>
         </View>
       </View>
@@ -326,3 +331,4 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
+

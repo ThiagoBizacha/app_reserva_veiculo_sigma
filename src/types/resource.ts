@@ -4,6 +4,26 @@ export type ResourceStatus = "Disponivel" | "Em uso" | "Reservado" | "Manutencao
 
 export type VehicleCategory = "Sedan" | "SUV" | "Pickup";
 
+export interface NewVehiclePayload {
+  name: string;
+  code: string;
+  plate: string;
+  brand: string;
+  model: string;
+  year: string;
+  vehicleCategory: VehicleCategory;
+  currentMileage: string;
+  location: string;
+  responsible: string;
+  description: string;
+  rentalCompany?: string;
+  vehicleDocumentAttachment?: string;
+  nextMaintenanceDate?: string;
+  nextMaintenanceMileage?: string;
+  observation?: string;
+  requiresApproval?: boolean;
+}
+
 export interface Resource {
   id: string;
   vehicleId?: string;

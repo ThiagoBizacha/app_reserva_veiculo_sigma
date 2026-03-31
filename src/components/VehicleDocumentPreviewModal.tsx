@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+﻿import { Feather } from "@expo/vector-icons";
 import type { ReactNode } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
@@ -27,9 +27,9 @@ export function VehicleDocumentPreviewModal({
         <View style={styles.sheet}>
           <View style={styles.header}>
             <View style={styles.headerCopy}>
-              <Text style={styles.title}>Documento do veiculo</Text>
+              <Text style={styles.title}>Documento do veículo</Text>
               <Text style={styles.subtitle}>
-                Pre-visualizacao do PDF mockado para {resource.code}
+                Pré-visualização do PDF mockado para {resource.code}
               </Text>
             </View>
             <Pressable style={styles.closeIconButton} onPress={onClose}>
@@ -41,7 +41,7 @@ export function VehicleDocumentPreviewModal({
             <View style={styles.infoBanner}>
               <Feather name="file-text" size={18} color={colors.primaryDark} />
               <Text style={styles.infoBannerText}>
-                Arquivo vinculado: {resource.vehicleDocumentAttachment ?? "Nao informado"}
+                Arquivo vinculado: {resource.vehicleDocumentAttachment ?? "Não informado"}
               </Text>
             </View>
 
@@ -49,8 +49,8 @@ export function VehicleDocumentPreviewModal({
               <View style={styles.pageHeader}>
                 <View style={styles.pageHeaderCopy}>
                   <Text style={styles.pageOverline}>CRLV DIGITAL</Text>
-                  <Text style={styles.pageTitle}>Documento do Veiculo</Text>
-                  <Text style={styles.pageSubtitle}>Uso interno / visualizacao mockada</Text>
+                  <Text style={styles.pageTitle}>Documento do Veículo</Text>
+                  <Text style={styles.pageSubtitle}>Uso interno / visualização mockada</Text>
                 </View>
                 <View style={styles.pageBadge}>
                   <Text style={styles.pageBadgeText}>PDF</Text>
@@ -58,9 +58,9 @@ export function VehicleDocumentPreviewModal({
               </View>
 
               <View style={styles.fieldGrid}>
-                <DocumentField label="Veiculo" value={resource.name} />
+                <DocumentField label="Veículo" value={resource.name} />
                 <DocumentField label="Placa" value={resource.plate ?? "-"} />
-                <DocumentField label="Codigo" value={resource.code} />
+                <DocumentField label="Código" value={resource.code} />
                 <DocumentField label="RENAVAM" value={buildMockRenavam(resource)} />
                 <DocumentField label="Marca / Modelo" value={`${resource.brand ?? "-"} ${resource.model ?? ""}`.trim()} />
                 <DocumentField label="Chassi" value={buildMockChassis(resource)} />
@@ -69,44 +69,44 @@ export function VehicleDocumentPreviewModal({
                 <DocumentField label="Locadora" value={resource.rentalCompany ?? "-"} />
                 <DocumentField label="Capacidade" value={resource.capacity ?? "-"} />
                 <DocumentField label="Base" value={resource.location} />
-                <DocumentField label="Responsavel" value={resource.responsible} />
+                <DocumentField label="Responsável" value={resource.responsible} />
               </View>
 
               <Section title="Controle operacional">
                 <DocumentField label="Km atual" value={resource.currentMileage ? `${resource.currentMileage} km` : "-"} />
                 <DocumentField
-                  label="Ultima vistoria"
+                  label="Última vistoria"
                   value={resource.lastInspectionDate ? formatDateTime(resource.lastInspectionDate) : "-"}
                 />
                 <DocumentField
-                  label="Proxima manutencao"
+                  label="Próxima manutenção"
                   value={resource.nextMaintenanceDate ? formatDateTime(resource.nextMaintenanceDate) : "-"}
                 />
                 <DocumentField
-                  label="Previsao de retorno"
+                  label="Previsão de retorno"
                   value={resource.nextAvailableAt ? formatDateTime(resource.nextAvailableAt) : "-"}
                 />
               </Section>
 
-              <Section title="Observacoes">
+              <Section title="Observações">
                 <Text style={styles.noteText}>
-                  {resource.observation ?? "Sem observacoes adicionais para este documento."}
+                  {resource.observation ?? "Sem observações adicionais para este documento."}
                 </Text>
               </Section>
 
               <View style={styles.footer}>
                 <Text style={styles.footerText}>
-                  Documento mockado para demonstracao do fluxo de PDF na frota.
+                  Documento mockado para demonstração do fluxo de PDF na frota.
                 </Text>
                 <Text style={styles.footerMeta}>
-                  {referenceDate ? `Atualizado em ${formatDateTime(referenceDate)}` : "Sem data de referencia"}
+                  {referenceDate ? `Atualizado em ${formatDateTime(referenceDate)}` : "Sem data de referência"}
                 </Text>
               </View>
             </View>
           </ScrollView>
 
           <Pressable style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeButtonText}>Fechar visualizacao</Text>
+            <Text style={styles.closeButtonText}>Fechar visualização</Text>
           </Pressable>
         </View>
       </View>
@@ -325,3 +325,4 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
+
