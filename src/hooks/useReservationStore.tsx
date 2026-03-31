@@ -60,6 +60,8 @@ interface ReservationStoreValue {
   toggleResourceMaintenance: (resourceId: string) => void;
   createVehicle: (payload: NewVehiclePayload) => ActionResult;
   createUser: (payload: NewUserPayload) => ActionResult;
+  updateVehicle: (resourceId: string, payload: NewVehiclePayload) => ActionResult;
+  updateUser: (userId: string, payload: NewUserPayload) => ActionResult;
   createReservation: (payload: NewReservationPayload) => ActionResult;
   cancelReservation: (reservationId: string) => ActionResult;
   checkInReservation: (reservationId: string, payload: ReservationOperationPayload) => ActionResult;
@@ -89,7 +91,7 @@ const STORAGE_KEYS = {
   users: "@sigma-reserva/users",
 };
 
-const MOCK_DATA_eERSION = "2026-03-27-reservation-policy-v2";
+const MOCK_DATA_eERSION = "2026-03-31-fleet-refresh-v1";
 
 const ReservationStoreContext = createContext<ReservationStoreValue | null>(null);
 
@@ -257,7 +259,7 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
     );
   };
 
-  const createVehicle = (payload: NewVehiclePayload): ActionResult => {
+  const validateVehiclePayload = (payload: NewVehiclePayload, resourceId?: string) => {
     const requiredFields = [
       payload.name,
       payload.code,
@@ -272,52 +274,84 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
     ];
 
     if (requiredFields.some((field) => !field.trim())) {
-      return { success: false, message: "Preencha todos os campos obrigatórios do veículo." };
+      return "Preencha todos os campos obrigatórios do veículo.";
     }
 
-    if (resources.some((item) => item.code.toLowerCase() === payload.code.trim().toLowerCase())) {
-      return { success: false, message: "Já existe um veículo com esse código." };
+    if (
+      resources.some(
+        (item) =>
+          item.id !== resourceId && item.code.toLowerCase() === payload.code.trim().toLowerCase()
+      )
+    ) {
+      return "Já existe um veículo com esse código.";
     }
 
-    if (resources.some((item) => item.plate?.toLowerCase() === payload.plate.trim().toLowerCase())) {
-      return { success: false, message: "Já existe um veículo com essa placa." };
+    if (
+      resources.some(
+        (item) =>
+          item.id !== resourceId &&
+          item.plate?.toLowerCase() === payload.plate.trim().toLowerCase()
+      )
+    ) {
+      return "Já existe um veículo com essa placa.";
     }
 
+    return null;
+  };
+
+  const buildVehicleRecord = (
+    payload: NewVehiclePayload,
+    existingResource?: Resource
+  ): Resource => {
     const vehicleCount = resources.filter((item) => item.category === "Veiculo").length + 1;
+    const normalizedName = payload.name.trim();
     const normalizedCode = payload.code.trim().toUpperCase();
     const normalizedPlate = payload.plate.trim().toUpperCase();
     const normalizedBrand = payload.brand.trim();
+    const normalizedModel = payload.model.trim();
     const normalizedMileage = payload.currentMileage.trim();
-    const resource: Resource = {
-      id: `res-${Date.now()}`,
-      vehicleId: `VEH-${String(vehicleCount).padStart(3, "0")}`,
-      name: payload.name.trim(),
+
+    return {
+      id: existingResource?.id ?? `res-${Date.now()}`,
+      vehicleId:
+        existingResource?.vehicleId ?? `VEH-${String(vehicleCount).padStart(3, "0")}`,
+      name: normalizedName,
       code: normalizedCode,
-      category: "Veiculo",
-      status: "Disponivel",
+      category: existingResource?.category ?? "Veiculo",
+      status: existingResource?.status ?? "Disponivel",
       plate: normalizedPlate,
-      model: payload.model.trim(),
+      model: normalizedModel,
       brand: normalizedBrand,
       year: payload.year.trim(),
       rentalCompany: payload.rentalCompany?.trim() || "Cadastro interno",
       vehicleCategory: payload.vehicleCategory,
       currentMileage: normalizedMileage,
-      lastInspectionDate: new Date().toISOString(),
+      lastInspectionDate: existingResource?.lastInspectionDate ?? new Date().toISOString(),
       vehicleDocumentAttachment: payload.vehicleDocumentAttachment?.trim() || "",
-      vehiclePhotoAttachments: [],
-      lastMaintenanceDate: new Date().toISOString(),
+      vehiclePhotoAttachments: existingResource?.vehiclePhotoAttachments ?? [],
+      lastMaintenanceDate: existingResource?.lastMaintenanceDate ?? new Date().toISOString(),
       nextMaintenanceDate: payload.nextMaintenanceDate?.trim() || undefined,
-      lastMaintenanceMileage: normalizedMileage,
+      lastMaintenanceMileage: existingResource?.lastMaintenanceMileage ?? normalizedMileage,
       nextMaintenanceMileage: payload.nextMaintenanceMileage?.trim() || undefined,
       observation: payload.observation?.trim() || undefined,
       location: payload.location.trim(),
-      capacity: "5 lugares",
+      capacity: existingResource?.capacity ?? "5 lugares",
       description: payload.description.trim(),
       responsible: payload.responsible.trim(),
       requiresApproval: payload.requiresApproval ?? true,
       imageHint: payload.vehicleCategory.toLowerCase(),
-      tags: [payload.vehicleCategory, normalizedBrand].filter(Boolean),
+      nextAvailableAt: existingResource?.nextAvailableAt,
+      tags: [payload.vehicleCategory, normalizedBrand, normalizedModel].filter(Boolean),
     };
+  };
+
+  const createVehicle = (payload: NewVehiclePayload): ActionResult => {
+    const validationError = validateVehiclePayload(payload);
+    if (validationError) {
+      return { success: false, message: validationError };
+    }
+
+    const resource = buildVehicleRecord(payload);
 
     setResources((current) => [resource, ...current]);
 
@@ -328,7 +362,32 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
     };
   };
 
-  const createUser = (payload: NewUserPayload): ActionResult => {
+  const updateVehicle = (resourceId: string, payload: NewVehiclePayload): ActionResult => {
+    const existingResource = resources.find((item) => item.id === resourceId);
+
+    if (!existingResource) {
+      return { success: false, message: "Veículo não encontrado." };
+    }
+
+    const validationError = validateVehiclePayload(payload, resourceId);
+    if (validationError) {
+      return { success: false, message: validationError };
+    }
+
+    const updatedResource = buildVehicleRecord(payload, existingResource);
+
+    setResources((current) =>
+      current.map((item) => (item.id === resourceId ? updatedResource : item))
+    );
+
+    return {
+      success: true,
+      message: `Veículo ${updatedResource.code} atualizado com sucesso.`,
+      resource: updatedResource,
+    };
+  };
+
+  const validateUserPayload = (payload: NewUserPayload, userId?: string) => {
     const requiredFields = [
       payload.name,
       payload.fullName,
@@ -344,41 +403,51 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
     ];
 
     if (requiredFields.some((field) => !field.trim())) {
-      return { success: false, message: "Preencha todos os campos obrigatórios do usuário." };
-    }
-
-    if (
-      usersData.some(
-        (item) => item.matricula.toLowerCase() === payload.matricula.trim().toLowerCase()
-      )
-    ) {
-      return { success: false, message: "Já existe um usuário com essa matrícula." };
+      return "Preencha todos os campos obrigatórios do usuário.";
     }
 
     if (
       usersData.some(
         (item) =>
+          item.id !== userId &&
+          item.matricula.toLowerCase() === payload.matricula.trim().toLowerCase()
+      )
+    ) {
+      return "Já existe um usuário com essa matrícula.";
+    }
+
+    if (
+      usersData.some(
+        (item) =>
+          item.id !== userId &&
           item.emailCorporativo.toLowerCase() === payload.emailCorporativo.trim().toLowerCase()
       )
     ) {
-      return { success: false, message: "Já existe um usuário com esse e-mail corporativo." };
+      return "Já existe um usuário com esse e-mail corporativo.";
     }
 
-    if (usersData.some((item) => item.cpf === payload.cpf.trim())) {
-      return { success: false, message: "Já existe um usuário com esse CPF." };
+    if (
+      usersData.some((item) => item.id !== userId && item.cpf === payload.cpf.trim())
+    ) {
+      return "Já existe um usuário com esse CPF.";
     }
 
-    const generatedId = `usr-${Date.now()}`;
+    return null;
+  };
+
+  const buildUserRecord = (payload: NewUserPayload, existingUser?: User): User => {
+    const resolvedId = existingUser?.id ?? `usr-${Date.now()}`;
     const corporateEmail = payload.emailCorporativo.trim().toLowerCase();
-    const user: User = {
-      id: generatedId,
-      userId: generatedId,
+
+    return {
+      id: resolvedId,
+      userId: existingUser?.userId ?? resolvedId,
       name: payload.name.trim(),
       fullName: payload.fullName.trim(),
       cpf: payload.cpf.trim(),
       gestorVeiculo: payload.role !== "Solicitante",
       matricula: payload.matricula.trim().toUpperCase(),
-      matriz: payload.matriz?.trim() || currentUser?.matriz || "Belo Horizonte",
+      matriz: payload.matriz?.trim() || existingUser?.matriz || currentUser?.matriz || "Belo Horizonte",
       role: payload.role,
       area: payload.areaDepartamento.trim(),
       areaDepartamento: payload.areaDepartamento.trim(),
@@ -386,16 +455,25 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       email: corporateEmail,
       emailCorporativo: corporateEmail,
       telefone: payload.telefone.trim(),
-      gestorId: payload.gestorId?.trim() || currentUser?.gestorId || currentUser?.id,
+      gestorId: payload.gestorId?.trim() || existingUser?.gestorId || currentUser?.gestorId || currentUser?.id,
       cnhNumero: payload.cnhNumero.trim().toUpperCase(),
       cnhCategoria: payload.cnhCategoria.trim().toUpperCase(),
       cnhUfEmissao: payload.cnhUfEmissao.trim().toUpperCase(),
       cnhStatus: payload.cnhStatus,
-      cnhDataUltimaValidacao: new Date().toISOString(),
+      cnhDataUltimaValidacao: existingUser?.cnhDataUltimaValidacao ?? new Date().toISOString(),
       cnhAnexo: payload.cnhAnexo?.trim() || "",
-      termosPaytrack: true,
+      termosPaytrack: existingUser?.termosPaytrack ?? true,
       observacao: payload.observacao?.trim() || undefined,
     };
+  };
+
+  const createUser = (payload: NewUserPayload): ActionResult => {
+    const validationError = validateUserPayload(payload);
+    if (validationError) {
+      return { success: false, message: validationError };
+    }
+
+    const user = buildUserRecord(payload);
 
     setUsersData((current) => [user, ...current]);
 
@@ -403,6 +481,31 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       success: true,
       message: `Usuário ${user.fullName} cadastrado com sucesso.`,
       user,
+    };
+  };
+
+  const updateUser = (userId: string, payload: NewUserPayload): ActionResult => {
+    const existingUser = usersData.find((item) => item.id === userId);
+
+    if (!existingUser) {
+      return { success: false, message: "Usuário não encontrado." };
+    }
+
+    const validationError = validateUserPayload(payload, userId);
+    if (validationError) {
+      return { success: false, message: validationError };
+    }
+
+    const updatedUser = buildUserRecord(payload, existingUser);
+
+    setUsersData((current) =>
+      current.map((item) => (item.id === userId ? updatedUser : item))
+    );
+
+    return {
+      success: true,
+      message: `Usuário ${updatedUser.fullName} atualizado com sucesso.`,
+      user: updatedUser,
     };
   };
 
@@ -735,6 +838,8 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       toggleResourceMaintenance,
       createVehicle,
       createUser,
+      updateVehicle,
+      updateUser,
       createReservation,
       cancelReservation,
       checkInReservation,

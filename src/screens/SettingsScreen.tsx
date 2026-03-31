@@ -13,7 +13,15 @@ import {
 } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
-import type { CnhStatus, NewUserPayload, NewVehiclePayload, UserRole, VehicleCategory } from "@/types";
+import type {
+  CnhStatus,
+  NewUserPayload,
+  NewVehiclePayload,
+  Resource,
+  User,
+  UserRole,
+  VehicleCategory,
+} from "@/types";
 
 type FeedbackState = {
   tone: "success" | "error";
@@ -64,6 +72,93 @@ function buildInitialUserForm(matriz: string, gestorId?: string): NewUserPayload
     cnhAnexo: "",
     observacao: "",
   };
+}
+
+function mapVehicleToForm(resource: Resource): NewVehiclePayload {
+  return {
+    name: resource.name,
+    code: resource.code,
+    plate: resource.plate ?? "",
+    brand: resource.brand ?? "",
+    model: resource.model ?? "",
+    year: resource.year ?? "",
+    vehicleCategory: resource.vehicleCategory ?? "SUV",
+    currentMileage: resource.currentMileage ?? "",
+    location: resource.location,
+    responsible: resource.responsible,
+    description: resource.description,
+    rentalCompany: resource.rentalCompany ?? "",
+    vehicleDocumentAttachment: resource.vehicleDocumentAttachment ?? "",
+    nextMaintenanceDate: resource.nextMaintenanceDate ?? "",
+    nextMaintenanceMileage: resource.nextMaintenanceMileage ?? "",
+    observation: resource.observation ?? "",
+    requiresApproval: resource.requiresApproval,
+  };
+}
+
+function mapUserToForm(user: User): NewUserPayload {
+  return {
+    name: user.name,
+    fullName: user.fullName,
+    cpf: user.cpf,
+    matricula: user.matricula,
+    role: user.role,
+    areaDepartamento: user.areaDepartamento,
+    centroCusto: user.centroCusto,
+    emailCorporativo: user.emailCorporativo,
+    telefone: user.telefone,
+    cnhNumero: user.cnhNumero,
+    cnhCategoria: user.cnhCategoria,
+    cnhUfEmissao: user.cnhUfEmissao,
+    cnhStatus: normalizeCnhStatus(user.cnhStatus),
+    matriz: user.matriz,
+    gestorId: user.gestorId,
+    cnhAnexo: user.cnhAnexo,
+    observacao: user.observacao ?? "",
+  };
+}
+
+type PillTone = "success" | "danger" | "warning" | "neutral";
+
+function normalizeText(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function normalizeCnhStatus(status: string): CnhStatus {
+  return normalizeText(status) === "valida" ? "Válida" : "Vencida";
+}
+
+function getVehicleStatusLabel(status: Resource["status"]) {
+  switch (status) {
+    case "Disponivel":
+      return "Disponível";
+    case "Manutencao":
+      return "Manutenção";
+    default:
+      return status;
+  }
+}
+
+function getVehicleStatusTone(status: Resource["status"]): PillTone {
+  switch (status) {
+    case "Disponivel":
+      return "success";
+    case "Em uso":
+    case "Reservado":
+      return "warning";
+    case "Manutencao":
+      return "danger";
+    default:
+      return "neutral";
+  }
+}
+
+function getCnhStatusLabel(status: string) {
+  return normalizeText(status) === "valida" ? "CNH válida" : "CNH vencida";
+}
+
+function getCnhStatusTone(status: string): PillTone {
+  return normalizeText(status) === "valida" ? "success" : "danger";
 }
 
 interface ChoiceGroupProps {
@@ -120,6 +215,32 @@ function FeedbackBanner({ feedback }: { feedback: FeedbackState }) {
   );
 }
 
+function StatusPill({ label, tone }: { label: string; tone: PillTone }) {
+  return (
+    <View
+      style={[
+        styles.statusPill,
+        tone === "success" && styles.statusPillSuccess,
+        tone === "danger" && styles.statusPillDanger,
+        tone === "warning" && styles.statusPillWarning,
+        tone === "neutral" && styles.statusPillNeutral,
+      ]}
+    >
+      <Text
+        style={[
+          styles.statusPillText,
+          tone === "success" && styles.statusPillTextSuccess,
+          tone === "danger" && styles.statusPillTextDanger,
+          tone === "warning" && styles.statusPillTextWarning,
+          tone === "neutral" && styles.statusPillTextNeutral,
+        ]}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 interface FormModalProps {
   visible: boolean;
   title: string;
@@ -163,7 +284,10 @@ interface SettingsActionCardProps {
   helper: string;
   buttonLabel: string;
   onPress: () => void;
+  secondaryButtonLabel?: string;
+  onSecondaryPress?: () => void;
   feedback?: FeedbackState | null;
+  children?: ReactNode;
 }
 
 function SettingsActionCard({
@@ -173,7 +297,10 @@ function SettingsActionCard({
   helper,
   buttonLabel,
   onPress,
+  secondaryButtonLabel,
+  onSecondaryPress,
   feedback,
+  children,
 }: SettingsActionCardProps) {
   return (
     <Card style={styles.actionCard}>
@@ -185,9 +312,55 @@ function SettingsActionCard({
       </View>
       <Text style={styles.sectionTitle}>{title}</Text>
       <Text style={styles.sectionSubtitle}>{subtitle}</Text>
-      <PrimaryButton label={buttonLabel} onPress={onPress} />
+      <View style={styles.actionButtonsStack}>
+        <PrimaryButton label={buttonLabel} onPress={onPress} />
+        {secondaryButtonLabel && onSecondaryPress ? (
+          <SecondaryButton label={secondaryButtonLabel} onPress={onSecondaryPress} />
+        ) : null}
+      </View>
       {feedback ? <FeedbackBanner feedback={feedback} /> : null}
+      {children ? <View style={styles.expandableSection}>{children}</View> : null}
     </Card>
+  );
+}
+
+interface CatalogItemProps {
+  icon: keyof typeof Feather.glyphMap;
+  title: string;
+  subtitle: string;
+  meta: string;
+  badgeLabel: string;
+  badgeTone: PillTone;
+  onPress: () => void;
+}
+
+function CatalogItem({
+  icon,
+  title,
+  subtitle,
+  meta,
+  badgeLabel,
+  badgeTone,
+  onPress,
+}: CatalogItemProps) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.catalogItem, pressed && styles.catalogItemPressed]}>
+      <View style={styles.catalogItemIcon}>
+        <Feather name={icon} size={18} color={colors.primaryDark} />
+      </View>
+      <View style={styles.catalogItemCopy}>
+        <View style={styles.catalogItemTitleRow}>
+          <Text style={styles.catalogItemTitle}>{title}</Text>
+          <StatusPill label={badgeLabel} tone={badgeTone} />
+        </View>
+        <Text style={styles.catalogItemSubtitle}>{subtitle}</Text>
+        <Text style={styles.catalogItemMeta}>{meta}</Text>
+      </View>
+      <View style={styles.catalogItemAction}>
+        <Text style={styles.catalogItemActionText}>Editar</Text>
+        <Feather name="chevron-right" size={18} color={colors.primaryDark} />
+      </View>
+    </Pressable>
   );
 }
 
@@ -265,6 +438,8 @@ export function SettingsScreen() {
     currentUser,
     createVehicle,
     createUser,
+    updateVehicle,
+    updateUser,
     exportReservationsReport,
   } = useReservationStore();
 
@@ -278,8 +453,21 @@ export function SettingsScreen() {
   const [isExporting, setIsExporting] = useState(false);
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [isVehicleCatalogOpen, setIsVehicleCatalogOpen] = useState(false);
+  const [isUserCatalogOpen, setIsUserCatalogOpen] = useState(false);
+  const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
 
-  const totalVehicles = resources.filter((item) => item.category === "Veiculo").length;
+  const vehicles = resources
+    .filter((item) => item.category === "Veiculo")
+    .slice()
+    .sort((left, right) => left.code.localeCompare(right.code, "pt-BR"));
+  const orderedUsers = users
+    .slice()
+    .sort((left, right) => left.fullName.localeCompare(right.fullName, "pt-BR"));
+  const totalVehicles = vehicles.length;
+  const isEditingVehicle = Boolean(editingVehicleId);
+  const isEditingUser = Boolean(editingUserId);
 
   const updateVehicleField = <K extends keyof NewVehiclePayload>(
     field: K,
@@ -293,48 +481,106 @@ export function SettingsScreen() {
   };
 
   const resetVehicleForm = () => {
-    setVehicleForm(emptyVehicleForm);
+    if (editingVehicleId) {
+      const vehicleToRestore = vehicles.find((item) => item.id === editingVehicleId);
+      if (vehicleToRestore) {
+        setVehicleForm(mapVehicleToForm(vehicleToRestore));
+      }
+    } else {
+      setVehicleForm(emptyVehicleForm);
+    }
+
     setVehicleFeedback(null);
   };
 
   const resetUserForm = () => {
-    setUserForm(buildInitialUserForm(currentUser.matriz, currentUser.gestorId));
+    if (editingUserId) {
+      const userToRestore = orderedUsers.find((item) => item.id === editingUserId);
+      if (userToRestore) {
+        setUserForm(mapUserToForm(userToRestore));
+      }
+    } else {
+      setUserForm(buildInitialUserForm(currentUser.matriz, currentUser.gestorId));
+    }
+
     setUserFeedback(null);
   };
 
   const openVehicleModal = () => {
+    setVehicleForm(emptyVehicleForm);
+    setEditingVehicleId(null);
     setVehicleFeedback(null);
     setIsVehicleModalOpen(true);
   };
 
   const openUserModal = () => {
+    setUserForm(buildInitialUserForm(currentUser.matriz, currentUser.gestorId));
+    setEditingUserId(null);
     setUserFeedback(null);
     setIsUserModalOpen(true);
   };
 
-  const handleCreateVehicle = () => {
-    const result = createVehicle(vehicleForm);
+  const openVehicleEditModal = (vehicle: Resource) => {
+    setIsVehicleCatalogOpen(true);
+    setVehicleForm(mapVehicleToForm(vehicle));
+    setEditingVehicleId(vehicle.id);
+    setVehicleFeedback(null);
+    setIsVehicleModalOpen(true);
+  };
+
+  const openUserEditModal = (user: User) => {
+    setIsUserCatalogOpen(true);
+    setUserForm(mapUserToForm(user));
+    setEditingUserId(user.id);
+    setUserFeedback(null);
+    setIsUserModalOpen(true);
+  };
+
+  const closeVehicleModal = () => {
+    setIsVehicleModalOpen(false);
+    setEditingVehicleId(null);
+    setVehicleForm(emptyVehicleForm);
+    setVehicleFeedback(null);
+  };
+
+  const closeUserModal = () => {
+    setIsUserModalOpen(false);
+    setEditingUserId(null);
+    setUserForm(buildInitialUserForm(currentUser.matriz, currentUser.gestorId));
+    setUserFeedback(null);
+  };
+
+  const handleSaveVehicle = () => {
+    const result = editingVehicleId
+      ? updateVehicle(editingVehicleId, vehicleForm)
+      : createVehicle(vehicleForm);
     setVehicleFeedback({
       tone: result.success ? "success" : "error",
       message: result.message,
     });
 
     if (result.success) {
-      setVehicleForm(emptyVehicleForm);
-      setIsVehicleModalOpen(false);
+      closeVehicleModal();
+      setVehicleFeedback({
+        tone: "success",
+        message: result.message,
+      });
     }
   };
 
-  const handleCreateUser = () => {
-    const result = createUser(userForm);
+  const handleSaveUser = () => {
+    const result = editingUserId ? updateUser(editingUserId, userForm) : createUser(userForm);
     setUserFeedback({
       tone: result.success ? "success" : "error",
       message: result.message,
     });
 
     if (result.success) {
-      resetUserForm();
-      setIsUserModalOpen(false);
+      closeUserModal();
+      setUserFeedback({
+        tone: "success",
+        message: result.message,
+      });
     }
   };
 
@@ -400,23 +646,105 @@ export function SettingsScreen() {
 
         <SettingsActionCard
           icon="truck"
-          title="Cadastrar novo veículo"
-          subtitle="Abra o formulário somente quando precisar incluir um novo item na frota."
+          title="Gerenciar veículos"
+          subtitle="Cadastre um novo veículo ou abra a lista quando quiser editar um cadastro existente."
           helper={`${totalVehicles} veículos cadastrados`}
-          buttonLabel="Abrir formulário de veículo"
+          buttonLabel="Cadastrar veículo"
+          secondaryButtonLabel={
+            isVehicleCatalogOpen ? "Ocultar veículos cadastrados" : "Ver veículos cadastrados"
+          }
+          onSecondaryPress={() => setIsVehicleCatalogOpen((current) => !current)}
           onPress={openVehicleModal}
           feedback={!isVehicleModalOpen ? vehicleFeedback : null}
-        />
+        >
+          {isVehicleCatalogOpen ? (
+            <>
+              <View style={styles.catalogHeader}>
+                <View style={styles.catalogHeaderCopy}>
+                  <Text style={styles.catalogTitle}>Veículos cadastrados</Text>
+                  <Text style={styles.catalogSubtitle}>
+                    Toque em um item para abrir a edição com os dados preenchidos.
+                  </Text>
+                </View>
+                <View style={styles.catalogHeaderBadge}>
+                  <Feather name="chevron-up" size={18} color={colors.primaryDark} />
+                </View>
+              </View>
+
+              <View style={styles.catalogList}>
+                {vehicles.length > 0 ? (
+                  vehicles.map((vehicle) => (
+                    <CatalogItem
+                      key={vehicle.id}
+                      icon="truck"
+                      title={`${vehicle.code} · ${vehicle.name}`}
+                      subtitle={`${vehicle.plate ?? "Sem placa"} · ${vehicle.brand ?? "-"} ${vehicle.model ?? ""}`.trim()}
+                      meta={`${vehicle.location} | Responsável: ${vehicle.responsible}`}
+                      badgeLabel={getVehicleStatusLabel(vehicle.status)}
+                      badgeTone={getVehicleStatusTone(vehicle.status)}
+                      onPress={() => openVehicleEditModal(vehicle)}
+                    />
+                  ))
+                ) : (
+                  <Text style={styles.catalogEmptyState}>
+                    Nenhum veículo cadastrado no momento.
+                  </Text>
+                )}
+              </View>
+            </>
+          ) : null}
+        </SettingsActionCard>
 
         <SettingsActionCard
           icon="users"
-          title="Cadastrar novo usuário"
-          subtitle="Abra o formulário sob demanda para manter a tela mais leve e focada."
+          title="Gerenciar usuários"
+          subtitle="Cadastre novas pessoas e abra a lista apenas quando quiser editar um usuário existente."
           helper={`${users.length} usuários cadastrados`}
-          buttonLabel="Abrir formulário de usuário"
+          buttonLabel="Cadastrar usuário"
+          secondaryButtonLabel={
+            isUserCatalogOpen ? "Ocultar usuários cadastrados" : "Ver usuários cadastrados"
+          }
+          onSecondaryPress={() => setIsUserCatalogOpen((current) => !current)}
           onPress={openUserModal}
           feedback={!isUserModalOpen ? userFeedback : null}
-        />
+        >
+          {isUserCatalogOpen ? (
+            <>
+              <View style={styles.catalogHeader}>
+                <View style={styles.catalogHeaderCopy}>
+                  <Text style={styles.catalogTitle}>Usuários cadastrados</Text>
+                  <Text style={styles.catalogSubtitle}>
+                    Selecione um cadastro para revisar perfil, CNH, contato e anexos.
+                  </Text>
+                </View>
+                <View style={styles.catalogHeaderBadge}>
+                  <Feather name="chevron-up" size={18} color={colors.primaryDark} />
+                </View>
+              </View>
+
+              <View style={styles.catalogList}>
+                {orderedUsers.length > 0 ? (
+                  orderedUsers.map((user) => (
+                    <CatalogItem
+                      key={user.id}
+                      icon="user"
+                      title={user.fullName}
+                      subtitle={`${user.role} · ${user.matricula}`}
+                      meta={`${user.areaDepartamento} | ${user.emailCorporativo}`}
+                      badgeLabel={getCnhStatusLabel(user.cnhStatus)}
+                      badgeTone={getCnhStatusTone(user.cnhStatus)}
+                      onPress={() => openUserEditModal(user)}
+                    />
+                  ))
+                ) : (
+                  <Text style={styles.catalogEmptyState}>
+                    Nenhum usuário cadastrado no momento.
+                  </Text>
+                )}
+              </View>
+            </>
+          ) : null}
+        </SettingsActionCard>
 
         <Card style={styles.actionCard}>
           <View style={styles.actionCardTopRow}>
@@ -445,10 +773,23 @@ export function SettingsScreen() {
 
       <FormModal
         visible={isVehicleModalOpen}
-        title="Novo veículo"
-        subtitle="Preencha os dados do cadastro e adicione o anexo do documento do veículo."
-        onClose={() => setIsVehicleModalOpen(false)}
+        title={isEditingVehicle ? "Editar veículo" : "Novo veículo"}
+        subtitle={
+          isEditingVehicle
+            ? "Revise os dados do veículo e salve as alterações no cadastro atual."
+            : "Preencha os dados do cadastro e adicione o anexo do documento do veículo."
+        }
+        onClose={closeVehicleModal}
       >
+        {isEditingVehicle ? (
+          <View style={styles.editingBanner}>
+            <Text style={styles.editingBannerLabel}>Editando cadastro</Text>
+            <Text style={styles.editingBannerValue}>
+              {vehicleForm.code || "Veículo"} · {vehicleForm.name || "Sem nome"}
+            </Text>
+          </View>
+        ) : null}
+
         <View style={styles.formStack}>
           <FormField
             label="Nome do veículo"
@@ -598,18 +939,37 @@ export function SettingsScreen() {
         {vehicleFeedback ? <FeedbackBanner feedback={vehicleFeedback} /> : null}
 
         <View style={styles.modalActions}>
-          <PrimaryButton label="Salvar veículo" onPress={handleCreateVehicle} />
-          <SecondaryButton label="Limpar formulário" onPress={resetVehicleForm} />
-          <SecondaryButton label="Fechar" onPress={() => setIsVehicleModalOpen(false)} />
+          <PrimaryButton
+            label={isEditingVehicle ? "Salvar alterações" : "Salvar veículo"}
+            onPress={handleSaveVehicle}
+          />
+          <SecondaryButton
+            label={isEditingVehicle ? "Restaurar dados" : "Limpar formulário"}
+            onPress={resetVehicleForm}
+          />
+          <SecondaryButton label="Fechar" onPress={closeVehicleModal} />
         </View>
       </FormModal>
 
       <FormModal
         visible={isUserModalOpen}
-        title="Novo usuário"
-        subtitle="Preencha os dados do cadastro e adicione o anexo do documento do usuário."
-        onClose={() => setIsUserModalOpen(false)}
+        title={isEditingUser ? "Editar usuário" : "Novo usuário"}
+        subtitle={
+          isEditingUser
+            ? "Revise o cadastro atual, atualize a CNH e salve as alterações do usuário."
+            : "Preencha os dados do cadastro e adicione o anexo do documento do usuário."
+        }
+        onClose={closeUserModal}
       >
+        {isEditingUser ? (
+          <View style={styles.editingBanner}>
+            <Text style={styles.editingBannerLabel}>Editando cadastro</Text>
+            <Text style={styles.editingBannerValue}>
+              {userForm.fullName || "Usuário"} · {userForm.matricula || "Sem matrícula"}
+            </Text>
+          </View>
+        ) : null}
+
         <View style={styles.formStack}>
           <View style={styles.row}>
             <View style={styles.column}>
@@ -766,9 +1126,15 @@ export function SettingsScreen() {
         {userFeedback ? <FeedbackBanner feedback={userFeedback} /> : null}
 
         <View style={styles.modalActions}>
-          <PrimaryButton label="Salvar usuário" onPress={handleCreateUser} />
-          <SecondaryButton label="Limpar formulário" onPress={resetUserForm} />
-          <SecondaryButton label="Fechar" onPress={() => setIsUserModalOpen(false)} />
+          <PrimaryButton
+            label={isEditingUser ? "Salvar alterações" : "Salvar usuário"}
+            onPress={handleSaveUser}
+          />
+          <SecondaryButton
+            label={isEditingUser ? "Restaurar dados" : "Limpar formulário"}
+            onPress={resetUserForm}
+          />
+          <SecondaryButton label="Fechar" onPress={closeUserModal} />
         </View>
       </FormModal>
     </>
@@ -807,6 +1173,9 @@ const styles = StyleSheet.create({
   actionCard: {
     gap: spacing.md,
   },
+  actionButtonsStack: {
+    gap: spacing.sm,
+  },
   actionCardTopRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -840,6 +1209,109 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: typography.bodySmall,
     lineHeight: 20,
+  },
+  expandableSection: {
+    gap: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  catalogHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  catalogHeaderCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  catalogHeaderBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  catalogTitle: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: "800",
+  },
+  catalogSubtitle: {
+    color: colors.textSecondary,
+    fontSize: typography.caption,
+    lineHeight: 18,
+  },
+  catalogList: {
+    gap: spacing.sm,
+  },
+  catalogEmptyState: {
+    color: colors.textMuted,
+    fontSize: typography.bodySmall,
+    lineHeight: 20,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  catalogItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  catalogItemPressed: {
+    opacity: 0.92,
+  },
+  catalogItemIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  catalogItemCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  catalogItemTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  catalogItemTitle: {
+    flex: 1,
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: "800",
+  },
+  catalogItemSubtitle: {
+    color: colors.textSecondary,
+    fontSize: typography.bodySmall,
+    lineHeight: 20,
+  },
+  catalogItemMeta: {
+    color: colors.textMuted,
+    fontSize: typography.caption,
+    lineHeight: 18,
+  },
+  catalogItemAction: {
+    alignItems: "center",
+    gap: 2,
+  },
+  catalogItemActionText: {
+    color: colors.primaryDark,
+    fontSize: typography.caption,
+    fontWeight: "700",
   },
   formStack: {
     gap: spacing.md,
@@ -917,6 +1389,44 @@ const styles = StyleSheet.create({
   feedbackTextError: {
     color: colors.danger,
   },
+  statusPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  statusPillSuccess: {
+    backgroundColor: colors.primarySoft,
+    borderColor: "#C9DDC0",
+  },
+  statusPillDanger: {
+    backgroundColor: "#FFF4F4",
+    borderColor: "#F1C1C1",
+  },
+  statusPillWarning: {
+    backgroundColor: "#FFF5E7",
+    borderColor: "#F4D4A8",
+  },
+  statusPillNeutral: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+  },
+  statusPillText: {
+    fontSize: typography.tiny,
+    fontWeight: "800",
+  },
+  statusPillTextSuccess: {
+    color: colors.primaryDark,
+  },
+  statusPillTextDanger: {
+    color: colors.danger,
+  },
+  statusPillTextWarning: {
+    color: colors.warning,
+  },
+  statusPillTextNeutral: {
+    color: colors.textSecondary,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(21, 32, 19, 0.32)",
@@ -967,6 +1477,26 @@ const styles = StyleSheet.create({
   modalContent: {
     padding: spacing.lg,
     gap: spacing.md,
+  },
+  editingBanner: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: "#D4E5CD",
+    backgroundColor: colors.primarySoft,
+    padding: spacing.md,
+    gap: 4,
+  },
+  editingBannerLabel: {
+    color: colors.primaryDark,
+    fontSize: typography.caption,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  editingBannerValue: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: "700",
   },
   attachmentBox: {
     minHeight: 52,
