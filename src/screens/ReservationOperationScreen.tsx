@@ -6,6 +6,7 @@ import {
   Image,
   Modal,
   Pressable,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,9 +14,11 @@ import {
   View,
 } from "react-native";
 import {
+  BackHeaderButton,
   EmptyState,
   ExitHeaderButton,
   OperationStepper,
+  PageHeader,
   PhotoSlotCard,
   SignatureField,
 } from "@/components";
@@ -666,16 +669,19 @@ export function ReservationOperationScreen({
         : "Próximo";
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Feather name="arrow-left" size={24} color={colors.white} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{title}</Text>
-        <View style={styles.headerMeta}>
-          <ExitHeaderButton variant="light" compact />
-          <Text style={styles.headerCode}>{reservation.code}</Text>
-        </View>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.headerFrame}>
+        <PageHeader
+          eyebrow={reservation.code}
+          title={title}
+          subtitle={
+            resolvedMode === "checkin"
+              ? "Registre condições, fotos e assinatura antes da saída do veículo."
+              : "Registre a devolução com evidências e assinatura do recebimento."
+          }
+          leftAction={<BackHeaderButton />}
+          rightContent={<ExitHeaderButton variant="light" compact />}
+        />
       </View>
 
       <View style={styles.stepperContainer}>
@@ -754,7 +760,7 @@ export function ReservationOperationScreen({
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -827,6 +833,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  headerFrame: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
   },
   emptyWrapper: {
     flex: 1,

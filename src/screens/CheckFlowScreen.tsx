@@ -1,9 +1,25 @@
 ﻿import { router } from "expo-router";
-import { EmptyState, PrimaryButton, ScreenContainer } from "@/components";
+import {
+  BackHeaderButton,
+  EmptyState,
+  ExitHeaderButton,
+  PageHeader,
+  PrimaryButton,
+  ScreenContainer,
+} from "@/components";
 
 export function CheckFlowScreen() {
   return (
-    <ScreenContainer>
+    <ScreenContainer
+      header={
+        <PageHeader
+          title="Operações"
+          subtitle="As retiradas e devoluções agora acontecem dentro das reservas ativas."
+          leftAction={<BackHeaderButton onPress={() => router.replace("/(tabs)/reservations")} />}
+          rightContent={<ExitHeaderButton variant="light" compact />}
+        />
+      }
+    >
       <EmptyState
         icon="check-square"
         title="Operações centralizadas em Minhas Reservas"

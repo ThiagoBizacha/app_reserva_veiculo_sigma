@@ -3,7 +3,7 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo, useState, type ReactNode } from "react";
 import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { ExitHeaderButton, ScreenContainer, StatusBadge } from "@/components";
+import { BackHeaderButton, ExitHeaderButton, PageHeader, ScreenContainer, StatusBadge } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import { addHours, formatDate, formatDateTime } from "@/utils/date";
@@ -118,13 +118,12 @@ export function NewReservationScreen({
 
   return (
     <ScreenContainer>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Feather name="arrow-left" size={24} color={colors.white} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Reserva de Veículo</Text>
-        <ExitHeaderButton variant="light" compact />
-      </View>
+      <PageHeader
+        title="Nova reserva"
+        subtitle="Escolha o veículo, o dia e o horário em um único fluxo."
+        leftAction={<BackHeaderButton />}
+        rightContent={<ExitHeaderButton variant="light" compact />}
+      />
 
       <View style={styles.heroCard}>
         <Text style={styles.heroTitle}>Nova Reserva</Text>

@@ -2,7 +2,7 @@
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { ExitHeaderButton, ScreenContainer, VehicleDocumentPreviewModal } from "@/components";
+import { ExitHeaderButton, PageHeader, ScreenContainer, VehicleDocumentPreviewModal } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import { formatDate, isWithinRange } from "@/utils/date";
@@ -103,18 +103,21 @@ export function ResourcesScreen() {
 
   return (
     <ScreenContainer>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Frota de Veículos</Text>
-        <View style={styles.headerActions}>
-          <ExitHeaderButton variant="light" compact />
-          <Pressable
-            style={styles.plusButton}
-            onPress={() => router.push({ pathname: "/reservation/new" })}
-          >
-            <Feather name="plus" size={22} color={colors.white} />
-          </Pressable>
-        </View>
-      </View>
+      <PageHeader
+        title="Frota de Veículos"
+        subtitle="Consulte a disponibilidade, os documentos e os próximos bloqueios da frota."
+        rightContent={
+          <View style={styles.headerActions}>
+            <ExitHeaderButton variant="light" compact />
+            <Pressable
+              style={styles.plusButton}
+              onPress={() => router.push({ pathname: "/reservation/new" })}
+            >
+              <Feather name="plus" size={18} color={colors.white} />
+            </Pressable>
+          </View>
+        }
+      />
 
       <View style={styles.searchBar}>
         <Feather name="search" size={18} color={colors.textMuted} />
@@ -296,8 +299,10 @@ const styles = StyleSheet.create({
   plusButton: {
     width: 40,
     height: 40,
-    borderRadius: radius.md,
-    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "rgba(255,255,255,0.10)",
     alignItems: "center",
     justifyContent: "center",
   },

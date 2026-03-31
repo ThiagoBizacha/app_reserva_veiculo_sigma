@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { ExitHeaderButton, ScreenContainer } from "@/components";
+import { BackHeaderButton, ExitHeaderButton, PageHeader, ScreenContainer } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import { formatDate, isWithinRange } from "@/utils/date";
@@ -10,7 +10,7 @@ import { RESERVATION_ACTIVE_STATUSES } from "@/utils/reservations";
 import type { Resource } from "@/types";
 
 export function AdminScreen() {
-  const { currentUser, resources, reservations, getSummary } = useReservationStore();
+  const { resources, reservations, getSummary } = useReservationStore();
   const summary = getSummary();
   const today = new Date();
   const vehicles = resources.filter((resource) => resource.category === "Veiculo");
@@ -96,16 +96,12 @@ export function AdminScreen() {
 
   return (
     <ScreenContainer>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Feather name="arrow-left" size={24} color={colors.white} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Painel da Frota</Text>
-        <View style={styles.headerMeta}>
-          <ExitHeaderButton variant="light" compact />
-          <Text style={styles.headerUser}>{currentUser.fullName}</Text>
-        </View>
-      </View>
+      <PageHeader
+        title="Painel da Frota"
+        subtitle="Acompanhe indicadores, reservas ativas e manutenção em um único painel."
+        leftAction={<BackHeaderButton />}
+        rightContent={<ExitHeaderButton variant="light" compact />}
+      />
 
       <View style={styles.metricsRow}>
         <MetricCard value={summary.available} label="Disponíveis" color={colors.primaryDark} />

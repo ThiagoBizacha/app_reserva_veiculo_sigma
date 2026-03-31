@@ -7,6 +7,7 @@ import {
   ExitHeaderButton,
   FormField,
   MetricCard,
+  PageHeader,
   PrimaryButton,
   ScreenContainer,
   SecondaryButton,
@@ -621,18 +622,11 @@ export function SettingsScreen() {
   return (
     <>
       <ScreenContainer>
-        <View style={styles.header}>
-          <View style={styles.headerTopRow}>
-            <View style={styles.headerCopy}>
-              <Text style={styles.headerTitle}>Configurações</Text>
-              <Text style={styles.headerSubtitle}>
-                Cadastre veículos, usuários e baixe a base de reservas em CSV sem poluir a tela
-                principal com formulários abertos o tempo todo.
-              </Text>
-            </View>
-            <ExitHeaderButton />
-          </View>
-        </View>
+        <PageHeader
+          title="Configurações"
+          subtitle="Gerencie cadastros e exporte a base de reservas com um fluxo mais limpo."
+          rightContent={<ExitHeaderButton variant="light" compact />}
+        />
 
         <View style={styles.metricsRow}>
           <MetricCard label="Veículos" value={totalVehicles} helper="Base de frota atual" />

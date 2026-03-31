@@ -2,10 +2,11 @@
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
+  BackHeaderButton,
   Card,
   EmptyState,
   ExitHeaderButton,
-  Header,
+  PageHeader,
   PrimaryButton,
   ReservationCard,
   ScreenContainer,
@@ -45,10 +46,11 @@ export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) 
   return (
     <ScreenContainer
       header={
-        <Header
+        <PageHeader
           eyebrow={resource.vehicleCategory ?? resource.category}
           title={resource.name}
-          rightContent={<ExitHeaderButton />}
+          leftAction={<BackHeaderButton />}
+          rightContent={<ExitHeaderButton variant="light" compact />}
           subtitle={`${resource.plate ?? resource.code} | ${resource.rentalCompany ?? "Frota"}`}
         />
       }

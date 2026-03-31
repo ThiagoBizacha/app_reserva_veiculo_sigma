@@ -2,10 +2,11 @@
 import { useState } from "react";
 import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
+  BackHeaderButton,
   Card,
   EmptyState,
   ExitHeaderButton,
-  Header,
+  PageHeader,
   PrimaryButton,
   ScreenContainer,
   SecondaryButton,
@@ -62,10 +63,11 @@ export function ReservationDetailScreen({ reservationId }: ReservationDetailScre
   return (
     <ScreenContainer
       header={
-        <Header
+        <PageHeader
           eyebrow={reservation.code}
           title="Detalhe da reserva"
-          rightContent={<ExitHeaderButton />}
+          leftAction={<BackHeaderButton />}
+          rightContent={<ExitHeaderButton variant="light" compact />}
           subtitle="Resumo completo do ciclo operacional, vistoria e histórico do veículo."
         />
       }

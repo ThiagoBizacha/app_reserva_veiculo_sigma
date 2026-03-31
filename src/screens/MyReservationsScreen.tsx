@@ -2,7 +2,7 @@
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { EmptyState, ExitHeaderButton, ScreenContainer, StatusBadge } from "@/components";
+import { EmptyState, ExitHeaderButton, PageHeader, ScreenContainer, StatusBadge } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import { formatDateTime } from "@/utils/date";
@@ -19,8 +19,7 @@ const filterMap: Record<ReservationFilter, ReservationStatus[]> = {
 };
 
 export function MyReservationsScreen() {
-  const { currentUser, currentUserId, reservations, resources, cancelReservation } =
-    useReservationStore();
+  const { currentUserId, reservations, resources, cancelReservation } = useReservationStore();
   const [filter, setFilter] = useState<ReservationFilter>("Ativas");
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -77,18 +76,11 @@ export function MyReservationsScreen() {
 
   return (
     <ScreenContainer>
-      <View style={styles.header}>
-        <View style={styles.headerTopRow}>
-          <View style={styles.headerCopy}>
-            <Text style={styles.headerTitle}>Minhas Reservas</Text>
-            <Text style={styles.headerSubtitle}>
-              Acompanhe o status e execute a próxima ação sem trocar de fluxo.
-            </Text>
-            <Text style={styles.headerUser}>{currentUser.fullName}</Text>
-          </View>
-          <ExitHeaderButton />
-        </View>
-      </View>
+      <PageHeader
+        title="Minhas Reservas"
+        subtitle="Acompanhe o status e execute a próxima ação sem trocar de fluxo."
+        rightContent={<ExitHeaderButton variant="light" compact />}
+      />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterTabs}>
         {(["Ativas", "Em uso", "Concluídas", "Canceladas"] as ReservationFilter[]).map((item) => {

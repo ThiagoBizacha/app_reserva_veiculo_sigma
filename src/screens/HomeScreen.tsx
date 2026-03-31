@@ -6,7 +6,6 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { DriverLicensePreviewModal, ExitHeaderButton, ScreenContainer } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
-import { formatDateTime } from "@/utils/date";
 import type { User } from "@/types";
 
 export function HomeScreen() {
@@ -72,38 +71,50 @@ export function HomeScreen() {
 
         <View style={styles.headerCopy}>
           <Text style={styles.headerTitle}>Reserva de Veículos</Text>
-          <Text style={styles.headerSubtitle}>
-            Entre pela agenda para escolher o veículo e reservar com menos passos.
-          </Text>
         </View>
       </LinearGradient>
 
-      <View style={styles.content}>
-        <View style={styles.profileCard}>
-          <View style={styles.profileTopRow}>
-            <View style={styles.profileCopy}>
-              <Text style={styles.profileName}>{currentUser.fullName}</Text>
-              <Text style={styles.profileMeta}>
-                {currentUser.matricula} | {requesterDepartment}
-              </Text>
-            </View>
+      <View style={styles.bodyStack}>
+        <View style={styles.tipCard}>
+          <View style={styles.tipIcon}>
+            <Feather name="info" size={16} color={colors.primaryDark} />
           </View>
+          <View style={styles.tipCopy}>
+            <Text style={styles.tipLabel}>Dica rápida</Text>
+            <Text style={styles.tipText}>
+              Use a agenda para escolher o veículo e reservar com menos etapas.
+            </Text>
+          </View>
+        </View>
 
-          <Text style={styles.profileMeta}>
-            Centro de Custo: {requesterCostCenter} | Gestor: {requesterManagerName}
-          </Text>
+        <View style={styles.content}>
+          <View style={styles.profileCard}>
+            <View style={styles.profileTopRow}>
+              <View style={styles.profileCopy}>
+                <Text style={styles.profileName}>{currentUser.fullName}</Text>
+                <Text style={styles.profileMeta}>
+                  {currentUser.matricula} | {requesterDepartment}
+                </Text>
+              </View>
+            </View>
 
-          <View style={styles.licenseCard}>
-            <View style={styles.licenseCopy}>
-              <View style={styles.licenseHeaderRow}>
-                <View style={styles.licenseTitleRow}>
-                  <Feather name="credit-card" size={16} color={colors.primaryDark} />
-                  <Text style={styles.licenseTitle}>CNH digital</Text>
-                </View>
+            <Text style={styles.profileMeta}>
+              Centro de Custo: {requesterCostCenter} | Gestor: {requesterManagerName}
+            </Text>
+
+            <View style={styles.licenseCard}>
+              <View style={styles.licenseTitleRow}>
+                <Feather name="credit-card" size={16} color={colors.primaryDark} />
+                <Text style={styles.licenseTitle}>CNH digital</Text>
+              </View>
+
+              <View style={styles.licenseActions}>
                 <View
                   style={[
                     styles.licenseStatusBadge,
-                    isLicenseValid ? styles.licenseStatusBadgeValid : styles.licenseStatusBadgeExpired,
+                    isLicenseValid
+                      ? styles.licenseStatusBadgeValid
+                      : styles.licenseStatusBadgeExpired,
                   ]}
                 >
                   <Text
@@ -117,83 +128,81 @@ export function HomeScreen() {
                     {cnhStatusLabel}
                   </Text>
                 </View>
-              </View>
 
-              <Text style={styles.licenseMeta}>
-                Categoria {currentUser.cnhCategoria} | Emissão {currentUser.cnhUfEmissao}
-              </Text>
-              <Text style={styles.licenseMeta}>
-                Última validação {formatDateTime(currentUser.cnhDataUltimaValidacao)}
+                <Pressable
+                  style={[
+                    styles.licenseAction,
+                    !currentUser.cnhAnexo && styles.licenseActionDisabled,
+                  ]}
+                  onPress={() => setLicenseUser(currentUser)}
+                  disabled={!currentUser.cnhAnexo}
+                >
+                  <Feather
+                    name="file-text"
+                    size={14}
+                    color={currentUser.cnhAnexo ? colors.primaryDark : colors.textMuted}
+                  />
+                  <Text
+                    style={[
+                      styles.licenseActionText,
+                      !currentUser.cnhAnexo && styles.licenseActionTextDisabled,
+                    ]}
+                  >
+                    Ver PDF
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.summaryRow}>
+            <SummaryCard label="Reservas ativas" value={myOpenReservations} />
+            <SummaryCard label="Veículos livres" value={summary.available} />
+            <SummaryCard label="Operações" value={actionableReservations.length} />
+          </View>
+
+          <Pressable style={styles.primaryCard} onPress={() => router.push("/(tabs)/agenda")}>
+            <View style={styles.primaryCardCopy}>
+              <Text style={styles.primaryEyebrow}>Fluxo principal</Text>
+              <Text style={styles.primaryTitle}>Reservar veículo</Text>
+              <Text style={styles.primaryDescription}>
+                Escolha o dia no calendário e siga para a reserva já com contexto preenchido.
               </Text>
             </View>
+            <View style={styles.primaryIcon}>
+              <Feather name="calendar" size={26} color={colors.primaryDark} />
+            </View>
+          </Pressable>
 
-            <Pressable
-              style={[
-                styles.licenseAction,
-                !currentUser.cnhAnexo && styles.licenseActionDisabled,
-              ]}
-              onPress={() => setLicenseUser(currentUser)}
-              disabled={!currentUser.cnhAnexo}
-            >
-              <Text
-                style={[
-                  styles.licenseActionText,
-                  !currentUser.cnhAnexo && styles.licenseActionTextDisabled,
-                ]}
+          <View style={styles.shortcuts}>
+            {shortcuts.map((item) => (
+              <Pressable
+                key={item.title}
+                style={styles.shortcutCard}
+                onPress={() => router.push(item.route as never)}
               >
-                Ver PDF
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        <View style={styles.summaryRow}>
-          <SummaryCard label="Reservas ativas" value={myOpenReservations} />
-          <SummaryCard label="Veículos livres" value={summary.available} />
-          <SummaryCard label="Operações" value={actionableReservations.length} />
-        </View>
-
-        <Pressable style={styles.primaryCard} onPress={() => router.push("/(tabs)/agenda")}>
-          <View style={styles.primaryCardCopy}>
-            <Text style={styles.primaryEyebrow}>Fluxo principal</Text>
-            <Text style={styles.primaryTitle}>Reservar veículo</Text>
-            <Text style={styles.primaryDescription}>
-              Escolha o dia no calendário e siga para a reserva já com contexto preenchido.
-            </Text>
-          </View>
-          <View style={styles.primaryIcon}>
-            <Feather name="calendar" size={26} color={colors.primaryDark} />
-          </View>
-        </Pressable>
-
-        <View style={styles.shortcuts}>
-          {shortcuts.map((item) => (
-            <Pressable
-              key={item.title}
-              style={styles.shortcutCard}
-              onPress={() => router.push(item.route as never)}
-            >
-              <View style={styles.shortcutIcon}>
-                <Feather
-                  name={item.icon as keyof typeof Feather.glyphMap}
-                  size={20}
-                  color={colors.primaryDark}
-                />
-              </View>
-              <View style={styles.shortcutCopy}>
-                <View style={styles.shortcutTitleRow}>
-                  <Text style={styles.shortcutTitle}>{item.title}</Text>
-                  {item.badge ? (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{item.badge}</Text>
-                    </View>
-                  ) : null}
+                <View style={styles.shortcutIcon}>
+                  <Feather
+                    name={item.icon as keyof typeof Feather.glyphMap}
+                    size={20}
+                    color={colors.primaryDark}
+                  />
                 </View>
-                <Text style={styles.shortcutDescription}>{item.description}</Text>
-              </View>
-              <Feather name="chevron-right" size={20} color={colors.primaryDark} />
-            </Pressable>
-          ))}
+                <View style={styles.shortcutCopy}>
+                  <View style={styles.shortcutTitleRow}>
+                    <Text style={styles.shortcutTitle}>{item.title}</Text>
+                    {item.badge ? (
+                      <View style={styles.badge}>
+                        <Text style={styles.badgeText}>{item.badge}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={styles.shortcutDescription}>{item.description}</Text>
+                </View>
+                <Feather name="chevron-right" size={20} color={colors.primaryDark} />
+              </Pressable>
+            ))}
+          </View>
         </View>
       </View>
 
@@ -262,21 +271,54 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
   },
   headerCopy: {
-    gap: spacing.xs,
+    gap: spacing.xxs,
   },
   headerTitle: {
     color: colors.white,
     fontSize: typography.display,
     fontWeight: "700",
   },
-  headerSubtitle: {
-    color: "#E3F7EE",
-    fontSize: typography.body,
-    lineHeight: 22,
+  bodyStack: {
+    gap: spacing.lg,
+    marginTop: -spacing.lg,
+  },
+  tipCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    ...shadows.soft,
+  },
+  tipIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tipCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  tipLabel: {
+    color: colors.primaryDark,
+    fontSize: typography.caption,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  tipText: {
+    color: colors.textSecondary,
+    fontSize: typography.bodySmall,
+    lineHeight: 20,
   },
   content: {
     gap: spacing.lg,
-    marginTop: -spacing.lg,
   },
   profileCard: {
     backgroundColor: colors.surface,
@@ -318,33 +360,26 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: spacing.md,
   },
-  licenseCopy: {
-    flex: 1,
-    gap: spacing.xxs,
-  },
-  licenseHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.sm,
-    marginBottom: 2,
-  },
   licenseTitleRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
-    flexShrink: 1,
+    flex: 1,
   },
   licenseTitle: {
     color: colors.primaryDark,
-    fontSize: typography.bodySmall,
+    fontSize: typography.body,
     fontWeight: "700",
+  },
+  licenseActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
   },
   licenseStatusBadge: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,
     borderRadius: radius.pill,
-    flexShrink: 0,
   },
   licenseStatusBadgeValid: {
     backgroundColor: colors.primarySoft,
@@ -362,24 +397,24 @@ const styles = StyleSheet.create({
   licenseStatusBadgeTextExpired: {
     color: colors.danger,
   },
-  licenseMeta: {
-    color: colors.textSecondary,
-    fontSize: typography.caption,
-  },
   licenseAction: {
-    minWidth: 96,
-    minHeight: 42,
+    minHeight: 38,
     borderRadius: radius.md,
-    backgroundColor: colors.primaryDark,
+    borderWidth: 1,
+    borderColor: "#C9DDC0",
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row",
+    gap: spacing.xs,
     paddingHorizontal: spacing.md,
   },
   licenseActionDisabled: {
-    backgroundColor: colors.disabled,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
   },
   licenseActionText: {
-    color: colors.white,
+    color: colors.primaryDark,
     fontSize: typography.caption,
     fontWeight: "700",
   },
