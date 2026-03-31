@@ -1,6 +1,10 @@
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
+import { Feather } from "@expo/vector-icons";
 import type { ReactNode } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, spacing, typography } from "@/theme";
 
 interface PageHeaderProps {
@@ -16,23 +20,38 @@ export function PageHeader({
   leftAction,
   rightContent,
 }: PageHeaderProps) {
+  const { currentUserName } = useReservationStore();
+  const insets = useSafeAreaInsets();
+
   return (
-    <LinearGradient colors={[colors.primaryDark, colors.green700]} style={styles.container}>
+    <LinearGradient
+      colors={[colors.primaryDark, colors.green700]}
+      style={[styles.container, { paddingTop: insets.top + spacing.sm }]}
+    >
+      {eyebrow ? (
+        <Text numberOfLines={1} style={styles.eyebrow}>{eyebrow}</Text>
+      ) : null}
       <View style={styles.row}>
-        <View style={styles.sideSlot}>{leftAction}</View>
-
-        <View style={styles.copy}>
-          {eyebrow ? (
-            <Text numberOfLines={1} style={styles.eyebrow}>
-              {eyebrow}
-            </Text>
-          ) : null}
-          <Text numberOfLines={2} style={styles.title}>
-            {title}
-          </Text>
+        {leftAction ? <View style={styles.leftSlot}>{leftAction}</View> : null}
+        <Text numberOfLines={1} adjustsFontSizeToFit style={styles.title}>
+          {title}
+        </Text>
+        <View style={styles.rightSlot}>
+          {rightContent ?? (
+            <View style={styles.userBlock}>
+              <Text style={styles.userName} numberOfLines={1}>{currentUserName}</Text>
+              <View style={styles.divider} />
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.replace("/")}
+                style={styles.exitButton}
+              >
+                <Feather name="log-out" size={12} color={colors.white} />
+                <Text style={styles.exitLabel}>Sair</Text>
+              </Pressable>
+            </View>
+          )}
         </View>
-
-        <View style={styles.sideSlot}>{rightContent}</View>
       </View>
     </LinearGradient>
   );
@@ -43,43 +62,67 @@ const styles = StyleSheet.create({
     marginHorizontal: -spacing.lg,
     marginTop: -spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.lg,
-    minHeight: 112,
+    paddingBottom: spacing.md,
     borderBottomLeftRadius: radius.xl,
     borderBottomRightRadius: radius.xl,
-    justifyContent: "center",
+    gap: spacing.xs,
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
-  sideSlot: {
-    width: 52,
-    alignItems: "center",
-    justifyContent: "center",
+  leftSlot: {
+    minWidth: 40,
   },
-  copy: {
-    flex: 1,
+  userBlock: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.xxs,
-    paddingHorizontal: spacing.sm,
+    gap: spacing.xs,
+  },
+  userName: {
+    color: "rgba(255,255,255,0.80)",
+    fontSize: typography.tiny,
+    fontWeight: "600",
+    maxWidth: 130,
+  },
+  divider: {
+    width: 1,
+    height: 12,
+    backgroundColor: "rgba(255,255,255,0.28)",
+  },
+  exitButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.20)",
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+  },
+  exitLabel: {
+    color: colors.white,
+    fontSize: typography.tiny,
+    fontWeight: "700",
   },
   eyebrow: {
-    color: "#DDEED6",
+    color: "rgba(255,255,255,0.65)",
     fontSize: typography.caption,
-    fontWeight: "700",
+    fontWeight: "600",
     textTransform: "uppercase",
-    letterSpacing: 0.8,
-    textAlign: "center",
+    letterSpacing: 0.6,
   },
   title: {
+    flex: 1,
     color: colors.white,
     fontSize: typography.title,
     fontWeight: "800",
     lineHeight: 30,
-    textAlign: "center",
+  },
+  rightSlot: {
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

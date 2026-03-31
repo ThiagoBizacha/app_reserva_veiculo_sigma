@@ -3,7 +3,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { DriverLicensePreviewModal, ExitHeaderButton, ScreenContainer } from "@/components";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { DriverLicensePreviewModal, ScreenContainer } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import type { User } from "@/types";
@@ -11,6 +12,7 @@ import type { User } from "@/types";
 export function HomeScreen() {
   const { currentUser, currentUserName, reservations, getActionableReservations, getSummary } =
     useReservationStore();
+  const insets = useSafeAreaInsets();
   const [licenseUser, setLicenseUser] = useState<User | null>(null);
   const summary = getSummary();
   const actionableReservations = getActionableReservations();
@@ -54,23 +56,23 @@ export function HomeScreen() {
 
   return (
     <ScreenContainer>
-      <LinearGradient colors={[colors.primaryDark, colors.green700]} style={styles.header}>
-        <View style={styles.topRow}>
-          <Text style={styles.brand}>SIGMA LITHIUM</Text>
-          <View style={styles.userActions}>
-            <View style={styles.userInfo}>
-              <Text style={styles.userName}>{currentUserName}</Text>
-              <View style={styles.statusRow}>
-                <View style={styles.onlineDot} />
-                <Text style={styles.onlineText}>Online</Text>
-              </View>
-            </View>
-            <ExitHeaderButton variant="light" compact />
+      <LinearGradient colors={[colors.primaryDark, colors.green700]} style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
+        <View style={styles.row}>
+          <Text numberOfLines={1} adjustsFontSizeToFit style={styles.headerTitle}>
+            Reserva de Veículos
+          </Text>
+          <View style={styles.userBlock}>
+            <Text style={styles.userName} numberOfLines={1}>{currentUserName}</Text>
+            <View style={styles.divider} />
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.replace("/")}
+              style={styles.exitButton}
+            >
+              <Feather name="log-out" size={12} color={colors.white} />
+              <Text style={styles.exitLabel}>Sair</Text>
+            </Pressable>
           </View>
-        </View>
-
-        <View style={styles.headerCopy}>
-          <Text style={styles.headerTitle}>Reserva de Veículos</Text>
         </View>
       </LinearGradient>
 
@@ -218,58 +220,53 @@ const styles = StyleSheet.create({
     marginHorizontal: -spacing.lg,
     marginTop: -spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.md,
     borderBottomLeftRadius: radius.xl,
     borderBottomRightRadius: radius.xl,
-    gap: spacing.lg,
   },
-  topRow: {
+  row: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: spacing.xs,
   },
-  brand: {
-    color: colors.white,
-    fontSize: typography.body,
-    fontWeight: "700",
-    letterSpacing: 1,
-  },
-  userInfo: {
-    alignItems: "flex-end",
-    gap: 4,
-  },
-  userActions: {
-    alignItems: "flex-end",
-    gap: spacing.sm,
+  userBlock: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
   },
   userName: {
-    color: colors.white,
-    fontSize: typography.caption,
-    fontWeight: "700",
+    color: "rgba(255,255,255,0.85)",
+    fontSize: typography.tiny,
+    fontWeight: "600",
+    maxWidth: 110,
   },
-  statusRow: {
+  divider: {
+    width: 1,
+    height: 14,
+    backgroundColor: "rgba(255,255,255,0.3)",
+  },
+  exitButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-  },
-  onlineDot: {
-    width: 8,
-    height: 8,
+    gap: 5,
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 4,
     borderRadius: radius.pill,
-    backgroundColor: "#5EF26D",
   },
-  onlineText: {
-    color: colors.primarySoft,
-    fontSize: typography.caption,
-  },
-  headerCopy: {
-    gap: spacing.xxs,
+  exitLabel: {
+    color: colors.white,
+    fontSize: typography.tiny,
+    fontWeight: "700",
   },
   headerTitle: {
+    flex: 1,
     color: colors.white,
-    fontSize: typography.display,
-    fontWeight: "700",
+    fontSize: typography.title,
+    fontWeight: "800",
+    lineHeight: 30,
   },
   bodyStack: {
     gap: spacing.lg,
