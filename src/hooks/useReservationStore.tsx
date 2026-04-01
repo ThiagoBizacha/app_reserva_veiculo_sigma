@@ -40,6 +40,7 @@ import {
   hasSignature,
   parseMileageValue,
 } from "@/utils/operation";
+import { findUserByReference } from "@/utils/users";
 
 interface ActionResult {
   success: boolean;
@@ -430,12 +431,17 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       return "Já existe um usuário com esse CPF.";
     }
 
+    if (payload.gestorId?.trim() && !findUserByReference(usersData, payload.gestorId)) {
+      return "Gestor não encontrado. Informe nome, e-mail, matrícula ou ID de um colaborador existente.";
+    }
+
     return null;
   };
 
   const buildUserRecord = (payload: NewUserPayload, existingUser?: User): User => {
     const resolvedId = existingUser?.id ?? `usr-${Date.now()}`;
     const corporateEmail = payload.emailCorporativo.trim().toLowerCase();
+    const resolvedManagerId = findUserByReference(usersData, payload.gestorId)?.id;
 
     return {
       id: resolvedId,
@@ -453,7 +459,11 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       email: corporateEmail,
       emailCorporativo: corporateEmail,
       telefone: payload.telefone.trim(),
-      gestorId: payload.gestorId?.trim() || existingUser?.gestorId || currentUser?.gestorId || currentUser?.id,
+      gestorId:
+        resolvedManagerId ||
+        existingUser?.gestorId ||
+        currentUser?.gestorId ||
+        currentUser?.id,
       cnhNumero: payload.cnhNumero.trim().toUpperCase(),
       cnhCategoria: payload.cnhCategoria.trim().toUpperCase(),
       cnhUfEmissao: payload.cnhUfEmissao.trim().toUpperCase(),

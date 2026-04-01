@@ -13,6 +13,7 @@ import {
 } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
+import { getUserDisplayName } from "@/utils/users";
 import type {
   CnhStatus,
   NewUserPayload,
@@ -92,7 +93,7 @@ function mapVehicleToForm(resource: Resource): NewVehiclePayload {
   };
 }
 
-function mapUserToForm(user: User): NewUserPayload {
+function mapUserToForm(user: User, users: User[]): NewUserPayload {
   return {
     name: user.name,
     fullName: user.fullName,
@@ -108,7 +109,7 @@ function mapUserToForm(user: User): NewUserPayload {
     cnhUfEmissao: user.cnhUfEmissao,
     cnhStatus: normalizeCnhStatus(user.cnhStatus),
     matriz: user.matriz,
-    gestorId: user.gestorId,
+    gestorId: getUserDisplayName(users, user.gestorId),
     cnhAnexo: user.cnhAnexo,
     observacao: user.observacao ?? "",
   };
@@ -441,7 +442,7 @@ export function SettingsScreen() {
 
   const [vehicleForm, setVehicleForm] = useState<NewVehiclePayload>(emptyVehicleForm);
   const [userForm, setUserForm] = useState<NewUserPayload>(() =>
-    buildInitialUserForm(currentUser.matriz, currentUser.gestorId)
+    buildInitialUserForm(currentUser.matriz, getUserDisplayName(users, currentUser.gestorId))
   );
   const [vehicleFeedback, setVehicleFeedback] = useState<FeedbackState | null>(null);
   const [userFeedback, setUserFeedback] = useState<FeedbackState | null>(null);
@@ -461,6 +462,7 @@ export function SettingsScreen() {
   const orderedUsers = users
     .slice()
     .sort((left, right) => left.fullName.localeCompare(right.fullName, "pt-BR"));
+  const currentManagerDisplayName = getUserDisplayName(orderedUsers, currentUser.gestorId);
   const totalVehicles = vehicles.length;
   const isEditingVehicle = Boolean(editingVehicleId);
   const isEditingUser = Boolean(editingUserId);
@@ -493,10 +495,10 @@ export function SettingsScreen() {
     if (editingUserId) {
       const userToRestore = orderedUsers.find((item) => item.id === editingUserId);
       if (userToRestore) {
-        setUserForm(mapUserToForm(userToRestore));
+        setUserForm(mapUserToForm(userToRestore, orderedUsers));
       }
     } else {
-      setUserForm(buildInitialUserForm(currentUser.matriz, currentUser.gestorId));
+      setUserForm(buildInitialUserForm(currentUser.matriz, currentManagerDisplayName));
     }
 
     setUserFeedback(null);
@@ -510,7 +512,7 @@ export function SettingsScreen() {
   };
 
   const openUserModal = () => {
-    setUserForm(buildInitialUserForm(currentUser.matriz, currentUser.gestorId));
+    setUserForm(buildInitialUserForm(currentUser.matriz, currentManagerDisplayName));
     setEditingUserId(null);
     setUserFeedback(null);
     setIsUserModalOpen(true);
@@ -526,7 +528,7 @@ export function SettingsScreen() {
 
   const openUserEditModal = (user: User) => {
     setIsUserCatalogOpen(true);
-    setUserForm(mapUserToForm(user));
+    setUserForm(mapUserToForm(user, orderedUsers));
     setEditingUserId(user.id);
     setUserFeedback(null);
     setIsUserModalOpen(true);
@@ -542,7 +544,7 @@ export function SettingsScreen() {
   const closeUserModal = () => {
     setIsUserModalOpen(false);
     setEditingUserId(null);
-    setUserForm(buildInitialUserForm(currentUser.matriz, currentUser.gestorId));
+    setUserForm(buildInitialUserForm(currentUser.matriz, currentManagerDisplayName));
     setUserFeedback(null);
   };
 
@@ -1028,11 +1030,11 @@ export function SettingsScreen() {
             </View>
             <View style={styles.column}>
               <FormField
-                label="Gestor ID"
-                placeholder={currentUser.gestorId ?? currentUser.id}
+                label="Gestor"
+                placeholder={currentManagerDisplayName || currentUser.fullName}
                 value={userForm.gestorId}
                 onChangeText={(value) => updateUserField("gestorId", value)}
-                helper="Opcional. Se vazio, o app usa o gestor do usuário logado."
+                helper="Opcional. Informe nome, e-mail, matrícula ou ID de um colaborador existente."
               />
             </View>
           </View>

@@ -30,14 +30,14 @@ type PickerField = "date" | null;
 
 const durationOptions = [1, 2, 3, 4] as const;
 const hourOptions = Array.from({ length: 24 }, (_, index) => index);
-const FIXED_BASE = "Araçuaí - MG";
 const INVALID_PAST_TIME_MESSAGE = "Escolha um horário futuro para continuar.";
 
 export function NewReservationScreen({
   initialDate,
   initialResourceId,
 }: NewReservationScreenProps) {
-  const { createReservation, reservations, resources, getResourceStatus } = useReservationStore();
+  const { createReservation, currentUser, reservations, resources, getResourceStatus } =
+    useReservationStore();
   const now = new Date();
   const nextWholeHour = getNextWholeHour(now);
   const requestedDate = initialDate ? new Date(initialDate) : nextWholeHour;
@@ -52,10 +52,11 @@ export function NewReservationScreen({
   })();
 
   const vehicleOptions = resources.filter((item) => item.category === "Veiculo");
+  const base = currentUser.matriz?.trim() ?? "";
+  const baseLabel = base || "Base não informada";
 
   const [resourceId, setResourceId] = useState(initialResourceId ?? "");
   const [purpose, setPurpose] = useState("");
-  const [base] = useState(FIXED_BASE);
   const [notes, setNotes] = useState("");
   const [reservationDate, setReservationDate] = useState(defaultDay);
   const [pickupTime, setPickupTime] = useState(defaultTime);
@@ -256,9 +257,9 @@ export function NewReservationScreen({
         />
         <Field
           label="Local / Base"
-          value={base}
+          value={baseLabel}
           onChangeText={() => undefined}
-          placeholder={"Ara\u00E7ua\u00ED - MG"}
+          placeholder="Base do usuário"
           editable={false}
         />
         <Field

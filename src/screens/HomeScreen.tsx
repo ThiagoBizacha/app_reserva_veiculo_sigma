@@ -10,7 +10,7 @@ import { colors, radius, shadows, spacing, typography } from "@/theme";
 import type { User } from "@/types";
 
 export function HomeScreen() {
-  const { currentUser, currentUserName, reservations, getSummary } = useReservationStore();
+  const { currentUser, currentUserName, reservations, users, getSummary } = useReservationStore();
   const insets = useSafeAreaInsets();
   const [licenseUser, setLicenseUser] = useState<User | null>(null);
   const summary = getSummary();
@@ -19,9 +19,10 @@ export function HomeScreen() {
       reservation.userId === currentUser.id &&
       ["Pendente", "Aprovada", "Em uso", "Em atraso"].includes(reservation.status)
   ).length;
-  const requesterDepartment = "Tecnologia da Informação";
-  const requesterCostCenter = "IT1000";
-  const requesterManagerName = "André Mello";
+  const requesterDepartment = currentUser.areaDepartamento;
+  const requesterCostCenter = currentUser.centroCusto;
+  const requesterManagerName =
+    users.find((user) => user.id === currentUser.gestorId)?.fullName ?? "Gestor não definido";
   const normalizedCnhStatus = currentUser.cnhStatus
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -54,13 +55,18 @@ export function HomeScreen() {
 
   return (
     <ScreenContainer>
-      <LinearGradient colors={[colors.primaryDark, colors.green700]} style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
+      <LinearGradient
+        colors={[colors.primaryDark, colors.green700]}
+        style={[styles.header, { paddingTop: insets.top + spacing.sm }]}
+      >
         <View style={styles.row}>
           <Text numberOfLines={1} adjustsFontSizeToFit style={styles.headerTitle}>
             Reserva de Veículos
           </Text>
           <View style={styles.userBlock}>
-            <Text style={styles.userName} numberOfLines={1}>{currentUserName}</Text>
+            <Text style={styles.userName} numberOfLines={1}>
+              {currentUserName}
+            </Text>
             <View style={styles.divider} />
             <Pressable
               accessibilityRole="button"
@@ -77,7 +83,9 @@ export function HomeScreen() {
       <View style={styles.bodyStack}>
         <View style={styles.tipInline}>
           <MaterialCommunityIcons name="lightbulb-on-outline" size={16} color={colors.primary} />
-          <Text style={styles.tipText}>Use a agenda para escolher o veículo e reservar com menos etapas.</Text>
+          <Text style={styles.tipText}>
+            Use a agenda para escolher o veículo e reservar com menos etapas.
+          </Text>
         </View>
 
         <View style={styles.content}>
@@ -92,7 +100,7 @@ export function HomeScreen() {
             </View>
 
             <Text style={styles.profileMeta}>
-              Centro de Custo: {requesterCostCenter} | Gestor: {requesterManagerName}
+              Centro de custo: {requesterCostCenter} | Gestor: {requesterManagerName}
             </Text>
 
             <View style={styles.licenseInline}>
