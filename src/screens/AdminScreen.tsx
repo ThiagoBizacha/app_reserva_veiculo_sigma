@@ -1,16 +1,14 @@
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { BackHeaderButton, PageHeader, ScreenContainer } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import { formatDate, isWithinRange } from "@/utils/date";
-import { RESERVATION_ACTIVE_STATUSES } from "@/utils/reservations";
-import type { Resource } from "@/types";
+import type { ReservationStatus, Resource } from "@/types";
 
 export function AdminScreen() {
-  const { resources, reservations, getSummary } = useReservationStore();
+  const { resources, reservations, getResourceStatus, getSummary } = useReservationStore();
   const summary = getSummary();
   const today = new Date();
   const vehicles = resources.filter((resource) => resource.category === "Veiculo");
@@ -22,14 +20,25 @@ export function AdminScreen() {
         isWithinRange(today, reservation.startDate, reservation.endDate)
     )
     .slice(0, 3);
-  const pendingReservations = reservations.filter(
-    (reservation) => reservation.status === "Pendente"
+  const reservedReservations = reservations.filter((reservation) =>
+    ["Pendente", "Aprovada"].includes(reservation.status)
   );
-  const maintenanceVehicles = vehicles
-    .filter((resource) => resource.status === "Manutencao")
-    .slice(0, 2);
+  const vehiclesInMaintenance = vehicles
+    .filter((resource) => getResourceStatus(resource.id, today) === "Manutencao")
+    .slice()
+    .sort((left, right) => sortByOptionalDate(left.nextAvailableAt, right.nextAvailableAt))
+    .slice(0, 3);
+  const upcomingMaintenanceVehicles = vehicles
+    .filter(
+      (resource) =>
+        getResourceStatus(resource.id, today) !== "Manutencao" &&
+        isDateWithinDays(resource.nextMaintenanceDate, 30)
+    )
+    .slice()
+    .sort((left, right) => sortByOptionalDate(left.nextMaintenanceDate, right.nextMaintenanceDate))
+    .slice(0, 3);
   const activeReservations = reservations.filter((reservation) =>
-    RESERVATION_ACTIVE_STATUSES.includes(reservation.status)
+    ["Pendente", "Aprovada", "Em uso", "Em atraso"].includes(reservation.status)
   );
   const lateReservations = reservations.filter(
     (reservation) => reservation.status === "Em atraso"
@@ -37,8 +46,10 @@ export function AdminScreen() {
   const documentsAvailable = vehicles.filter((resource) =>
     Boolean(resource.vehicleDocumentAttachment)
   ).length;
-  const upcomingMaintenance = vehicles.filter((resource) =>
-    isDateWithinDays(resource.nextMaintenanceDate, 30)
+  const upcomingMaintenance = vehicles.filter(
+    (resource) =>
+      getResourceStatus(resource.id, today) !== "Manutencao" &&
+      isDateWithinDays(resource.nextMaintenanceDate, 30)
   ).length;
   const averageMileage = getAverageMileage(vehicles);
 
@@ -61,7 +72,7 @@ export function AdminScreen() {
       icon: "bookmark",
       value: String(activeReservations.length),
       label: "Reservas ativas",
-      helper: "Aprovadas, em uso e em atraso",
+      helper: "Reservadas, em uso e em atraso",
       accentColor: colors.primaryDark,
     },
     {
@@ -82,7 +93,7 @@ export function AdminScreen() {
       icon: "tool",
       value: String(upcomingMaintenance),
       label: "Revisão 30d",
-      helper: "Manutenções próximas",
+      helper: "Manutenções previstas",
       accentColor: colors.warning,
     },
     {
@@ -156,12 +167,7 @@ export function AdminScreen() {
         ) : (
           todayReservations.map((reservation, index) => {
             const resource = resources.find((item) => item.id === reservation.resourceId);
-            const dotColor =
-              reservation.status === "Em uso"
-                ? colors.success
-                : reservation.status === "Pendente"
-                  ? colors.textMuted
-                  : colors.warning;
+            const dotColor = getReservationStatusColor(reservation.status);
 
             return (
               <View
@@ -175,7 +181,9 @@ export function AdminScreen() {
                 </View>
                 <View style={styles.inlineStatus}>
                   <View style={[styles.inlineDot, { backgroundColor: dotColor }]} />
-                  <Text style={styles.inlineStatusText}>{reservation.status}</Text>
+                  <Text style={styles.inlineStatusText}>
+                    {getReservationStatusLabel(reservation.status)}
+                  </Text>
                 </View>
               </View>
             );
@@ -183,29 +191,57 @@ export function AdminScreen() {
         )}
       </PanelCard>
 
-      <PanelCard title="Solicitações Pendentes de Aprovação">
+      <PanelCard title="Reservas Agendadas">
         <View style={styles.alertBox}>
-          <Feather name="bell" size={16} color={colors.white} />
+          <Feather name="bookmark" size={16} color={colors.white} />
           <Text style={styles.alertText}>
-            {pendingReservations.length} reservas aguardando aprovação do gestor
+            {reservedReservations.length} reservas aguardando check-in
           </Text>
         </View>
       </PanelCard>
 
-      <PanelCard title="Próximas Manutenções">
-        {maintenanceVehicles.length === 0 ? (
-          <Text style={styles.emptyText}>Nenhuma manutenção programada.</Text>
+      <PanelCard title="Veículos em Manutenção">
+        {vehiclesInMaintenance.length === 0 ? (
+          <Text style={styles.emptyText}>Nenhum veículo em manutenção neste momento.</Text>
         ) : (
-          maintenanceVehicles.map((vehicle, index) => (
+          vehiclesInMaintenance.map((vehicle, index) => (
             <View
               key={vehicle.id}
-              style={[styles.row, index < maintenanceVehicles.length - 1 && styles.rowDivider]}
+              style={[styles.row, index < vehiclesInMaintenance.length - 1 && styles.rowDivider]}
             >
               <Feather name="tool" size={18} color={colors.textSecondary} />
               <View style={styles.rowCopy}>
                 <Text style={styles.rowTitle}>{vehicle.name}</Text>
                 <Text style={styles.rowSubtitle}>
-                  Retorno: {vehicle.nextAvailableAt ? formatDate(vehicle.nextAvailableAt) : "A definir"}
+                  Retorno previsto:{" "}
+                  {vehicle.nextAvailableAt ? formatDate(vehicle.nextAvailableAt) : "A definir"}
+                </Text>
+              </View>
+            </View>
+          ))
+        )}
+      </PanelCard>
+
+      <PanelCard title="Próximas Manutenções">
+        {upcomingMaintenanceVehicles.length === 0 ? (
+          <Text style={styles.emptyText}>
+            Nenhuma manutenção prevista para os próximos 30 dias.
+          </Text>
+        ) : (
+          upcomingMaintenanceVehicles.map((vehicle, index) => (
+            <View
+              key={vehicle.id}
+              style={[
+                styles.row,
+                index < upcomingMaintenanceVehicles.length - 1 && styles.rowDivider,
+              ]}
+            >
+              <Feather name="calendar" size={18} color={colors.textSecondary} />
+              <View style={styles.rowCopy}>
+                <Text style={styles.rowTitle}>{vehicle.name}</Text>
+                <Text style={styles.rowSubtitle}>
+                  Prevista para {formatOptionalDate(vehicle.nextMaintenanceDate)} | Km{" "}
+                  {vehicle.nextMaintenanceMileage ?? "não informado"}
                 </Text>
               </View>
             </View>
@@ -301,34 +337,55 @@ function isDateWithinDays(value: string | undefined, days: number) {
   return diffInDays >= 0 && diffInDays <= days;
 }
 
+function formatOptionalDate(value?: string) {
+  return value ? formatDate(value) : "data não informada";
+}
+
+function sortByOptionalDate(left?: string, right?: string) {
+  if (!left && !right) {
+    return 0;
+  }
+
+  if (!left) {
+    return 1;
+  }
+
+  if (!right) {
+    return -1;
+  }
+
+  return new Date(left).getTime() - new Date(right).getTime();
+}
+
+function getReservationStatusLabel(status: ReservationStatus) {
+  if (status === "Pendente" || status === "Aprovada") {
+    return "Reservado";
+  }
+
+  if (status === "Concluida") {
+    return "Concluído";
+  }
+
+  return status;
+}
+
+function getReservationStatusColor(status: ReservationStatus) {
+  if (status === "Em uso") {
+    return colors.warning;
+  }
+
+  if (status === "Em atraso") {
+    return colors.danger;
+  }
+
+  if (status === "Pendente" || status === "Aprovada") {
+    return colors.info;
+  }
+
+  return colors.textMuted;
+}
+
 const styles = StyleSheet.create({
-  header: {
-    marginHorizontal: -spacing.lg,
-    marginTop: -spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.primaryDark,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  headerMeta: {
-    alignItems: "flex-end",
-    gap: spacing.xs,
-  },
-  headerTitle: {
-    color: colors.white,
-    fontSize: typography.section,
-    fontWeight: "700",
-    flex: 1,
-    textAlign: "center",
-  },
-  headerUser: {
-    color: colors.primarySoft,
-    fontSize: typography.caption,
-    maxWidth: 110,
-    textAlign: "right",
-  },
   metricsRow: {
     flexDirection: "row",
     gap: spacing.sm,
@@ -476,7 +533,7 @@ const styles = StyleSheet.create({
   alertBox: {
     minHeight: 44,
     borderRadius: radius.md,
-    backgroundColor: colors.warning,
+    backgroundColor: colors.info,
     paddingHorizontal: spacing.md,
     flexDirection: "row",
     alignItems: "center",
