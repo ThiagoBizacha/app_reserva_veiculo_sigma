@@ -2,17 +2,21 @@
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo, useState, type ReactNode } from "react";
-import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { BackHeaderButton, PageHeader, ScreenContainer, StatusBadge } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import {
+  APP_TIME_ZONE,
   addHours,
-  formatDate,
+  createDateInAppTimeZone,
+  formatAppDate,
   formatDateTime,
+  formatTime,
   getNextWholeHour,
   isPastDateTime,
   isSameCalendarDay,
+  mergeDateAndTimeInAppTimeZone,
   startOfDay,
 } from "@/utils/date";
 import { getResourceConflicts } from "@/utils/reservations";
@@ -22,10 +26,12 @@ interface NewReservationScreenProps {
   initialDate?: string;
 }
 
-type PickerField = "date" | "time" | null;
+type PickerField = "date" | null;
 
 const durationOptions = [1, 2, 3, 4] as const;
+const hourOptions = Array.from({ length: 24 }, (_, index) => index);
 const FIXED_BASE = "Araçuaí - MG";
+const INVALID_PAST_TIME_MESSAGE = "Escolha um horário futuro para continuar.";
 
 export function NewReservationScreen({
   initialDate,
@@ -36,23 +42,13 @@ export function NewReservationScreen({
   const nextWholeHour = getNextWholeHour(now);
   const requestedDate = initialDate ? new Date(initialDate) : nextWholeHour;
   const safeRequestedDate = isPastDateTime(requestedDate) ? nextWholeHour : requestedDate;
-  const defaultDay = new Date(
-    safeRequestedDate.getFullYear(),
-    safeRequestedDate.getMonth(),
-    safeRequestedDate.getDate(),
-    0,
-    0,
-    0,
-    0
-  );
+  const defaultDay = startOfDay(safeRequestedDate);
   const defaultTime = (() => {
     if (isSameCalendarDay(safeRequestedDate, now)) {
       return nextWholeHour;
     }
 
-    const futureTime = new Date(safeRequestedDate);
-    futureTime.setHours(8, 0, 0, 0);
-    return futureTime;
+    return addHours(startOfDay(safeRequestedDate), 8);
   })();
 
   const vehicleOptions = resources.filter((item) => item.category === "Veiculo");
@@ -66,14 +62,13 @@ export function NewReservationScreen({
   const [durationHours, setDurationHours] = useState<(typeof durationOptions)[number]>(1);
   const [pickerField, setPickerField] = useState<PickerField>(null);
   const [showResourceModal, setShowResourceModal] = useState(false);
+  const [showHourModal, setShowHourModal] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "error" | "success"; message: string } | null>(
     null
   );
 
   const startDate = useMemo(() => {
-    const next = new Date(reservationDate);
-    next.setHours(pickupTime.getHours(), pickupTime.getMinutes(), 0, 0);
-    return next.toISOString();
+    return mergeDateAndTimeInAppTimeZone(reservationDate, pickupTime).toISOString();
   }, [pickupTime, reservationDate]);
 
   const endDate = useMemo(() => addHours(startDate, durationHours).toISOString(), [durationHours, startDate]);
@@ -86,8 +81,9 @@ export function NewReservationScreen({
   const selectedResourceStatus = selectedResource
     ? getResourceStatus(selectedResource.id, new Date(startDate))
     : "Disponivel";
-  const isStartDateInPast = isPastDateTime(startDate, now);
-  const todayStart = startOfDay(now);
+  const selectedPickupHourLabel = formatTime(pickupTime);
+  const isStartDateInPast = isPastDateTime(startDate, new Date());
+  const todayStart = startOfDay(new Date());
   const isSubmitDisabled =
     !resourceId ||
     !purpose.trim() ||
@@ -95,52 +91,49 @@ export function NewReservationScreen({
     conflicts.length > 0 ||
     isStartDateInPast;
 
-  const onChangeDate =
-    (field: PickerField) => (event: DateTimePickerEvent, selected?: Date) => {
-      if (Platform.OS === "android") {
-        setPickerField(null);
-      }
+  const applyPastTimeFeedback = (nextStart: Date) => {
+    const currentDate = new Date();
 
-      if (event.type === "dismissed" || !selected || !field) {
-        return;
-      }
+    if (isPastDateTime(nextStart, currentDate)) {
+      setFeedback({
+        type: "error",
+        message: INVALID_PAST_TIME_MESSAGE,
+      });
+      return;
+    }
 
-      if (field === "date") {
-        const nextDate = new Date(selected);
-        nextDate.setHours(0, 0, 0, 0);
-        setReservationDate(nextDate);
+    setFeedback((current) => (current?.message === INVALID_PAST_TIME_MESSAGE ? null : current));
+  };
 
-        if (isSameCalendarDay(nextDate, now)) {
-          const todayPickup = new Date(nextDate);
-          todayPickup.setHours(pickupTime.getHours(), pickupTime.getMinutes(), 0, 0);
+  const onChangeDate = (event: DateTimePickerEvent, selected?: Date) => {
+    if (Platform.OS === "android") {
+      setPickerField(null);
+    }
 
-          if (isPastDateTime(todayPickup, now)) {
-            setPickupTime(getNextWholeHour(now));
-          }
-        }
+    if (event.type === "dismissed" || !selected) {
+      return;
+    }
 
-        return;
-      }
+    const nextDate = startOfDay(selected);
+    const nextStart = mergeDateAndTimeInAppTimeZone(nextDate, pickupTime);
 
-      const nextTime = new Date(pickupTime);
-      nextTime.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+    setReservationDate(nextDate);
+    applyPastTimeFeedback(nextStart);
+  };
 
-      const nextStart = new Date(reservationDate);
-      nextStart.setHours(nextTime.getHours(), nextTime.getMinutes(), 0, 0);
+  const handleSelectHour = (hour: number) => {
+    const nextTime = createDateInAppTimeZone({
+      year: 2000,
+      month: 1,
+      day: 1,
+      hour,
+    });
+    const nextStart = mergeDateAndTimeInAppTimeZone(reservationDate, nextTime);
 
-      if (isPastDateTime(nextStart, now)) {
-        setFeedback({
-          type: "error",
-          message: "Escolha um horário futuro para continuar.",
-        });
-        return;
-      }
-
-      setFeedback((current) =>
-        current?.message === "Escolha um horário futuro para continuar." ? null : current
-      );
-      setPickupTime(nextTime);
-    };
+    setPickupTime(nextTime);
+    setShowHourModal(false);
+    applyPastTimeFeedback(nextStart);
+  };
 
   const handleSave = () => {
     if (isStartDateInPast) {
@@ -216,11 +209,11 @@ export function NewReservationScreen({
 
       <Section title="Janela da Reserva">
         <Pressable style={styles.selector} onPress={() => setPickerField("date")}>
-          <Text style={styles.selectorText}>{formatDate(reservationDate)}</Text>
+          <Text style={styles.selectorText}>{formatAppDate(reservationDate)}</Text>
           <Feather name="calendar" size={18} color={colors.textMuted} />
         </Pressable>
 
-        <Pressable style={styles.selector} onPress={() => setPickerField("time")}>
+        <Pressable style={styles.selector} onPress={() => setShowHourModal(true)}>
           <Text style={styles.selectorText}>Retirada: {formatDateTime(startDate)}</Text>
           <Feather name="clock" size={18} color={colors.textMuted} />
         </Pressable>
@@ -340,7 +333,12 @@ export function NewReservationScreen({
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Selecionar veículo</Text>
-            <View style={styles.modalList}>
+            <ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={styles.modalList}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled
+            >
               {vehicleOptions.map((resource) => {
                 const optionStatus = getResourceStatus(resource.id, new Date(startDate));
 
@@ -369,8 +367,46 @@ export function NewReservationScreen({
                   </Pressable>
                 );
               })}
-            </View>
+            </ScrollView>
             <Pressable style={styles.secondaryButton} onPress={() => setShowResourceModal(false)}>
+              <Text style={styles.secondaryButtonText}>Fechar</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showHourModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowHourModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Selecionar horário</Text>
+            <ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={styles.hourList}
+              showsVerticalScrollIndicator={false}
+            >
+              {hourOptions.map((hour) => {
+                const hourLabel = `${String(hour).padStart(2, "0")}:00`;
+                const isSelected = selectedPickupHourLabel === hourLabel;
+
+                return (
+                  <Pressable
+                    key={hour}
+                    style={[styles.hourItem, isSelected && styles.hourItemActive]}
+                    onPress={() => handleSelectHour(hour)}
+                  >
+                    <Text style={[styles.hourItemText, isSelected && styles.hourItemTextActive]}>
+                      {hourLabel}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            <Pressable style={styles.secondaryButton} onPress={() => setShowHourModal(false)}>
               <Text style={styles.secondaryButtonText}>Fechar</Text>
             </Pressable>
           </View>
@@ -379,11 +415,12 @@ export function NewReservationScreen({
 
       {pickerField ? (
         <DateTimePicker
-          value={pickerField === "date" ? reservationDate : pickupTime}
-          mode={pickerField}
+          value={reservationDate}
+          mode="date"
           display={Platform.OS === "ios" ? "spinner" : "default"}
           minimumDate={pickerField === "date" ? todayStart : undefined}
-          onChange={onChangeDate(pickerField)}
+          timeZoneName={APP_TIME_ZONE}
+          onChange={onChangeDate}
         />
       ) : null}
     </ScreenContainer>
@@ -675,14 +712,19 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     gap: spacing.md,
+    maxHeight: "85%",
   },
   modalTitle: {
     color: colors.text,
     fontSize: typography.section,
     fontWeight: "700",
   },
+  modalScroll: {
+    maxHeight: 420,
+  },
   modalList: {
     gap: spacing.sm,
+    paddingBottom: spacing.xs,
   },
   modalItem: {
     padding: spacing.md,
@@ -713,6 +755,31 @@ const styles = StyleSheet.create({
   modalItemMeta: {
     color: colors.textSecondary,
     fontSize: typography.caption,
+  },
+  hourList: {
+    gap: spacing.sm,
+    paddingBottom: spacing.xs,
+  },
+  hourItem: {
+    minHeight: 48,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  hourItemActive: {
+    borderColor: colors.primaryDark,
+    backgroundColor: colors.primarySoft,
+  },
+  hourItemText: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: "700",
+  },
+  hourItemTextActive: {
+    color: colors.primaryDark,
   },
   secondaryButton: {
     minHeight: 48,

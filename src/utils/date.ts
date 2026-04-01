@@ -1,3 +1,5 @@
+export const APP_TIME_ZONE = "America/Sao_Paulo";
+
 const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
   day: "2-digit",
   month: "2-digit",
@@ -13,25 +15,145 @@ const weekdayFormatter = new Intl.DateTimeFormat("pt-BR", {
   weekday: "short",
 });
 
+const appDateFormatter = new Intl.DateTimeFormat("pt-BR", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  timeZone: APP_TIME_ZONE,
+});
+
+const appDateTimeFormatter = new Intl.DateTimeFormat("pt-BR", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: APP_TIME_ZONE,
+});
+
+const appTimeFormatter = new Intl.DateTimeFormat("pt-BR", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: APP_TIME_ZONE,
+});
+
+const appDateTimePartsFormatter = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+  timeZone: APP_TIME_ZONE,
+});
+
+const appOffsetFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: APP_TIME_ZONE,
+  timeZoneName: "shortOffset",
+});
+
 export const toDate = (value: string | Date) =>
   value instanceof Date ? new Date(value) : new Date(value);
 
-export const startOfDay = (value: string | Date) => {
-  const date = toDate(value);
-  date.setHours(0, 0, 0, 0);
+const getAppDateTimeParts = (value: string | Date) => {
+  const parts = Object.fromEntries(
+    appDateTimePartsFormatter
+      .formatToParts(toDate(value))
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  );
+
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour),
+    minute: Number(parts.minute),
+    second: Number(parts.second),
+  };
+};
+
+const getAppTimeZoneOffsetMinutes = (value: string | Date) => {
+  const timeZoneToken = appOffsetFormatter
+    .formatToParts(toDate(value))
+    .find((part) => part.type === "timeZoneName")?.value;
+
+  const match = timeZoneToken?.match(/^GMT([+-])(\d{1,2})(?::?(\d{2}))?$/);
+
+  if (!match) {
+    return 0;
+  }
+
+  const sign = match[1] === "-" ? -1 : 1;
+  return sign * (Number(match[2]) * 60 + Number(match[3] ?? 0));
+};
+
+export const createDateInAppTimeZone = ({
+  year,
+  month,
+  day,
+  hour = 0,
+  minute = 0,
+  second = 0,
+  millisecond = 0,
+}: {
+  year: number;
+  month: number;
+  day: number;
+  hour?: number;
+  minute?: number;
+  second?: number;
+  millisecond?: number;
+}) => {
+  let utcTimestamp = Date.UTC(year, month - 1, day, hour, minute, second, millisecond);
+  let date = new Date(utcTimestamp);
+  let offsetMinutes = getAppTimeZoneOffsetMinutes(date);
+
+  utcTimestamp -= offsetMinutes * 60 * 1000;
+  date = new Date(utcTimestamp);
+
+  const verifiedOffset = getAppTimeZoneOffsetMinutes(date);
+  if (verifiedOffset !== offsetMinutes) {
+    utcTimestamp -= (verifiedOffset - offsetMinutes) * 60 * 1000;
+    date = new Date(utcTimestamp);
+  }
+
   return date;
+};
+
+export const mergeDateAndTimeInAppTimeZone = (dateValue: string | Date, timeValue: string | Date) => {
+  const dateParts = getAppDateTimeParts(dateValue);
+  const timeParts = getAppDateTimeParts(timeValue);
+
+  return createDateInAppTimeZone({
+    year: dateParts.year,
+    month: dateParts.month,
+    day: dateParts.day,
+    hour: timeParts.hour,
+    minute: timeParts.minute,
+  });
+};
+
+export const startOfDay = (value: string | Date) => {
+  const parts = getAppDateTimeParts(value);
+
+  return createDateInAppTimeZone({
+    year: parts.year,
+    month: parts.month,
+    day: parts.day,
+  });
 };
 
 export const formatDate = (value: string | Date) => dateFormatter.format(toDate(value));
 
-export const formatDateTime = (value: string | Date) =>
-  new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(toDate(value));
+export const formatAppDate = (value: string | Date) => appDateFormatter.format(toDate(value));
+
+export const formatDateTime = (value: string | Date) => appDateTimeFormatter.format(toDate(value));
+
+export const formatTime = (value: string | Date) => appTimeFormatter.format(toDate(value));
 
 export const formatMonthYear = (value: Date) => {
   const formatted = monthFormatter.format(value);
@@ -102,9 +224,14 @@ export const getMonthMatrix = (value: Date) => {
 };
 
 export const toIsoDateTime = (date: Date, hours = 9) => {
-  const copy = new Date(date);
-  copy.setHours(hours, 0, 0, 0);
-  return copy.toISOString();
+  const parts = getAppDateTimeParts(date);
+
+  return createDateInAppTimeZone({
+    year: parts.year,
+    month: parts.month,
+    day: parts.day,
+    hour: hours,
+  }).toISOString();
 };
 
 export const addHours = (value: string | Date, hours: number) => {
@@ -115,14 +242,10 @@ export const addHours = (value: string | Date, hours: number) => {
 };
 
 export const isSameCalendarDay = (left: string | Date, right: string | Date) => {
-  const a = toDate(left);
-  const b = toDate(right);
+  const a = getAppDateTimeParts(left);
+  const b = getAppDateTimeParts(right);
 
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+  return a.year === b.year && a.month === b.month && a.day === b.day;
 };
 
 export const getDurationHours = (start: string | Date, end: string | Date) => {
@@ -137,15 +260,15 @@ export const getDurationHours = (start: string | Date, end: string | Date) => {
 };
 
 export const getNextWholeHour = (referenceDate = new Date()) => {
-  const next = new Date(referenceDate);
+  const parts = getAppDateTimeParts(referenceDate);
+  const currentHour = createDateInAppTimeZone({
+    year: parts.year,
+    month: parts.month,
+    day: parts.day,
+    hour: parts.hour,
+  });
   const shouldAdvanceHour =
-    next.getMinutes() > 0 || next.getSeconds() > 0 || next.getMilliseconds() > 0;
-  next.setSeconds(0, 0);
+    parts.minute > 0 || parts.second > 0 || toDate(referenceDate).getMilliseconds() > 0;
 
-  if (shouldAdvanceHour) {
-    next.setHours(next.getHours() + 1, 0, 0, 0);
-    return next;
-  }
-
-  return next;
+  return shouldAdvanceHour ? addHours(currentHour, 1) : currentHour;
 };
