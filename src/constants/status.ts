@@ -8,8 +8,7 @@ export const resourceStatusLabel: Record<ResourceStatus, string> = {
 };
 
 export const reservationStatusLabel: Record<ReservationStatus, string> = {
-  Pendente: "Pendente",
-  Aprovada: "Aprovada",
+  Reservado: "Reservado",
   "Em uso": "Em uso",
   Concluida: "Concluída",
   Cancelada: "Cancelada",

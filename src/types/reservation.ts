@@ -1,6 +1,5 @@
 export type ReservationStatus =
-  | "Pendente"
-  | "Aprovada"
+  | "Reservado"
   | "Em uso"
   | "Concluida"
   | "Cancelada"

@@ -3,7 +3,7 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo, useState, type ReactNode } from "react";
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { BackHeaderButton, PageHeader, ScreenContainer, StatusBadge } from "@/components";
+import { BackHeaderButton, EmptyState, PageHeader, ScreenContainer, StatusBadge } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import {
@@ -52,6 +52,7 @@ export function NewReservationScreen({
   })();
 
   const vehicleOptions = resources.filter((item) => item.category === "Veiculo");
+  const hasVehicleOptions = vehicleOptions.length > 0;
   const base = currentUser.matriz?.trim() ?? "";
   const baseLabel = base || "Base não informada";
 
@@ -181,14 +182,28 @@ export function NewReservationScreen({
       </View>
 
       <Section title="Veículo">
-        <Pressable style={styles.selector} onPress={() => setShowResourceModal(true)}>
+        <Pressable
+          style={[styles.selector, !hasVehicleOptions && styles.selectorDisabled]}
+          onPress={() => setShowResourceModal(true)}
+          disabled={!hasVehicleOptions}
+        >
           <Text style={[styles.selectorText, !selectedResource && styles.selectorPlaceholder]}>
             {selectedResource
               ? `${selectedResource.plate ?? selectedResource.code} | ${selectedResource.brand ?? ""} ${selectedResource.model ?? selectedResource.name}`
-              : "Selecionar veículo"}
+              : hasVehicleOptions
+                ? "Selecionar veículo"
+                : "Nenhum veículo disponível"}
           </Text>
           <Feather name="chevron-down" size={18} color={colors.textMuted} />
         </Pressable>
+
+        {!hasVehicleOptions ? (
+          <EmptyState
+            icon="truck"
+            title="Nenhum veículo cadastrado"
+            description="Cadastre veículos na frota para conseguir criar uma nova reserva."
+          />
+        ) : null}
 
         {selectedResource ? (
           <View style={styles.resourceSnapshot}>
@@ -340,34 +355,42 @@ export function NewReservationScreen({
               showsVerticalScrollIndicator={false}
               nestedScrollEnabled
             >
-              {vehicleOptions.map((resource) => {
-                const optionStatus = getResourceStatus(resource.id, new Date(startDate));
+              {vehicleOptions.length === 0 ? (
+                <EmptyState
+                  icon="truck"
+                  title="Nenhum veículo disponível"
+                  description="Cadastre um veículo primeiro para habilitar a criação de reservas."
+                />
+              ) : (
+                vehicleOptions.map((resource) => {
+                  const optionStatus = getResourceStatus(resource.id, new Date(startDate));
 
-                return (
-                  <Pressable
-                    key={resource.id}
-                    style={[styles.modalItem, resource.id === resourceId && styles.modalItemActive]}
-                    onPress={() => {
-                      setResourceId(resource.id);
-                      setShowResourceModal(false);
-                    }}
-                  >
-                    <View style={styles.modalItemTop}>
-                      <View style={styles.modalItemCopy}>
-                        <Text style={styles.modalItemTitle}>{resource.name}</Text>
-                        <Text style={styles.modalItemMeta}>
-                          {resource.plate ?? resource.code} | {resource.brand ?? "-"}{" "}
-                          {resource.model ?? ""}
-                        </Text>
-                        <Text style={styles.modalItemMeta}>
-                          {resource.rentalCompany ?? "-"} | Km {resource.currentMileage ?? "-"}
-                        </Text>
+                  return (
+                    <Pressable
+                      key={resource.id}
+                      style={[styles.modalItem, resource.id === resourceId && styles.modalItemActive]}
+                      onPress={() => {
+                        setResourceId(resource.id);
+                        setShowResourceModal(false);
+                      }}
+                    >
+                      <View style={styles.modalItemTop}>
+                        <View style={styles.modalItemCopy}>
+                          <Text style={styles.modalItemTitle}>{resource.name}</Text>
+                          <Text style={styles.modalItemMeta}>
+                            {resource.plate ?? resource.code} | {resource.brand ?? "-"}{" "}
+                            {resource.model ?? ""}
+                          </Text>
+                          <Text style={styles.modalItemMeta}>
+                            {resource.rentalCompany ?? "-"} | Km {resource.currentMileage ?? "-"}
+                          </Text>
+                        </View>
+                        <StatusBadge status={optionStatus} kind="resource" />
                       </View>
-                      <StatusBadge status={optionStatus} kind="resource" />
-                    </View>
-                  </Pressable>
-                );
-              })}
+                    </Pressable>
+                  );
+                })
+              )}
             </ScrollView>
             <Pressable style={styles.secondaryButton} onPress={() => setShowResourceModal(false)}>
               <Text style={styles.secondaryButtonText}>Fechar</Text>
@@ -531,6 +554,9 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: typography.body,
     flex: 1,
+  },
+  selectorDisabled: {
+    backgroundColor: colors.surfaceAlt,
   },
   selectorPlaceholder: {
     color: colors.textMuted,

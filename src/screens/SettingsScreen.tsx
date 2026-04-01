@@ -873,7 +873,7 @@ export function SettingsScreen() {
             </View>
             <View style={styles.column}>
               <ChoiceGroup
-                label="Exige aprovação"
+                label="Controle especial"
                 value={vehicleForm.requiresApproval ? "Sim" : "Não"}
                 options={["Sim", "Não"]}
                 onChange={(value) => updateVehicleField("requiresApproval", value === "Sim")}

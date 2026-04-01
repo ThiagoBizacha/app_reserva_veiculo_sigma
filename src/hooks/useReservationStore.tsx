@@ -26,6 +26,8 @@ import {
 } from "react";
 import {
   type CalendarDayState,
+  getActionableReservationsForUser,
+  isScheduledReservationActive,
   getCurrentResourceStatus,
   getFleetSummary,
   getResourceAvailabilityForDate,
@@ -40,6 +42,10 @@ import {
   hasSignature,
   parseMileageValue,
 } from "@/utils/operation";
+import {
+  getNextReservationCode,
+  normalizeReservationCodes,
+} from "@/utils/reservationCode";
 import { findUserByReference } from "@/utils/users";
 
 interface ActionResult {
@@ -92,14 +98,24 @@ const STORAGE_KEYS = {
   users: "@sigma-reserva/users",
 };
 
-const MOCK_DATA_eERSION = "2026-03-31-fleet-refresh-v1";
+const MOCK_DATA_eERSION = "2026-04-01-clean-reservation-base-v1";
+
+const freshStartResources = initialResources.map((resource) =>
+  resource.category === "Veiculo"
+    ? {
+        ...resource,
+        status: "Disponivel" as const,
+        nextAvailableAt: undefined,
+      }
+    : resource
+);
 
 const ReservationStoreContext = createContext<ReservationStoreValue | null>(null);
 
 export function ReservationStoreProvider({ children }: PropsWithChildren) {
   const [usersData, setUsersData] = useState(initialUsers);
-  const [resources, setResources] = useState(initialResources);
-  const [reservations, setReservations] = useState(initialReservations);
+  const [resources, setResources] = useState(freshStartResources);
+  const [reservations, setReservations] = useState(() => normalizeReservationCodes(initialReservations));
   const [isHydrated, setIsHydrated] = useState(false);
 
   const currentUser =
@@ -129,20 +145,22 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
         const shouldResetToLatestMocks = versionealue !== MOCK_DATA_eERSION;
 
         if (shouldResetToLatestMocks) {
-          setUsersData(initialUsers);
-          setReservations(initialReservations);
-          setResources(initialResources);
+          const nextUsers = usersealue ? (JSON.parse(usersealue) as User[]) : initialUsers;
+
+          setUsersData(nextUsers);
+          setReservations(normalizeReservationCodes(initialReservations));
+          setResources(freshStartResources);
           await AsyncStorage.multiSet([
             [STORAGE_KEYS.mockeersion, MOCK_DATA_eERSION],
-            [STORAGE_KEYS.reservations, JSON.stringify(initialReservations)],
-            [STORAGE_KEYS.resources, JSON.stringify(initialResources)],
-            [STORAGE_KEYS.users, JSON.stringify(initialUsers)],
+            [STORAGE_KEYS.reservations, JSON.stringify(normalizeReservationCodes(initialReservations))],
+            [STORAGE_KEYS.resources, JSON.stringify(freshStartResources)],
+            [STORAGE_KEYS.users, JSON.stringify(nextUsers)],
           ]);
           return;
         }
 
         if (reservationsealue) {
-          setReservations(JSON.parse(reservationsealue));
+          setReservations(normalizeReservationCodes(JSON.parse(reservationsealue) as Reservation[]));
         }
 
         if (resourcesealue) {
@@ -222,16 +240,7 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
   };
 
   const getActionableReservations = () =>
-    reservations
-      .filter(
-        (reservation) =>
-          reservation.userId === currentUserId &&
-          (reservation.status === "Aprovada" || reservation.status === "Em uso")
-      )
-      .sort(
-        (left, right) =>
-          new Date(left.startDate).getTime() - new Date(right.startDate).getTime()
-      );
+    getActionableReservationsForUser(reservations, currentUserId);
 
   const getSummary = (referenceDate = new Date()) =>
     getFleetSummary(resources, reservations, referenceDate);
@@ -585,10 +594,9 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       };
     }
 
-    const sequence = reservations.length + 35;
     const reservation: Reservation = {
       id: `rsv-${Date.now()}`,
-      code: `RSe-${new Date().getFullYear()}-${String(sequence).padStart(3, "0")}`,
+      code: getNextReservationCode(reservations, payload.startDate),
       resourceId: payload.resourceId,
       userId: currentUserId,
       title: `Reserva ${resource.name}`,
@@ -597,13 +605,12 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       startDate: payload.startDate,
       endDate: payload.endDate,
       plannedDurationHours: durationHours,
-      status: "Aprovada",
+      status: "Reservado",
       notes: payload.notes,
-      approver: currentUserName,
       history: [
         {
           id: `hist-${Date.now()}`,
-          label: "Reserva criada",
+          label: "Reserva reservada",
           timestamp: new Date().toISOString(),
           actor: currentUserName,
           note: payload.notes,
@@ -615,7 +622,7 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
 
     return {
       success: true,
-      message: `Reserva criada para ${durationHours}h e liberada para operação.`,
+      message: `Reserva criada para ${durationHours}h com status Reservado.`,
       reservation,
     };
   };
@@ -627,10 +634,17 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       return { success: false, message: "Reserva não encontrada." };
     }
 
-    if (reservation.status !== "Aprovada" && reservation.status !== "Pendente") {
+    if (reservation.status !== "Reservado") {
       return {
         success: false,
         message: "Só é possível cancelar reservas ainda não utilizadas.",
+      };
+    }
+
+    if (!isScheduledReservationActive(reservation)) {
+      return {
+        success: false,
+        message: "A janela da reserva já foi encerrada e não permite cancelamento.",
       };
     }
 
@@ -733,10 +747,17 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       return { success: false, message: "Reserva não encontrada." };
     }
 
-    if (reservation.status !== "Aprovada") {
+    if (reservation.status !== "Reservado") {
       return {
         success: false,
-        message: "Apenas reservas aprovadas podem iniciar check-in.",
+        message: "Apenas reservas reservadas podem iniciar check-in.",
+      };
+    }
+
+    if (!isScheduledReservationActive(reservation)) {
+      return {
+        success: false,
+        message: "A janela da reserva já foi encerrada e não permite check-in.",
       };
     }
 
@@ -757,7 +778,7 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       checkInData: inspection,
       history: appendHistoryItem(
         reservation,
-        "eistoria de saída concluída",
+        "Vistoria de saída concluída",
         payload.notes || `Km ${payload.mileage} | Combustível ${payload.fuelLevel}`
       ),
     };
@@ -768,7 +789,7 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
 
     return {
       success: true,
-      message: "Check-in realizado. O veículo está em uso.",
+      message: "Check-in realizado. A reserva agora está em uso.",
       reservation: updatedReservation,
     };
   };
@@ -818,7 +839,7 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
 
     return {
       success: true,
-      message: "Check-out realizado. Reserva concluída.",
+      message: "Check-out realizado. Reserva concluída e veículo disponível.",
       reservation: updatedReservation,
     };
   };

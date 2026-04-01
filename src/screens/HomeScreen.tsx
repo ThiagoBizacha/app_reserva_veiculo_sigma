@@ -10,15 +10,17 @@ import { colors, radius, shadows, spacing, typography } from "@/theme";
 import type { User } from "@/types";
 
 export function HomeScreen() {
-  const { currentUser, currentUserName, reservations, users, getSummary } = useReservationStore();
+  const {
+    currentUser,
+    currentUserName,
+    users,
+    getActionableReservations,
+    getSummary,
+  } = useReservationStore();
   const insets = useSafeAreaInsets();
   const [licenseUser, setLicenseUser] = useState<User | null>(null);
   const summary = getSummary();
-  const myOpenReservations = reservations.filter(
-    (reservation) =>
-      reservation.userId === currentUser.id &&
-      ["Pendente", "Aprovada", "Em uso", "Em atraso"].includes(reservation.status)
-  ).length;
+  const myOpenReservations = getActionableReservations().length;
   const requesterDepartment = currentUser.areaDepartamento;
   const requesterCostCenter = currentUser.centroCusto;
   const requesterManagerName =

@@ -4,15 +4,18 @@ const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
+  timeZone: APP_TIME_ZONE,
 });
 
 const monthFormatter = new Intl.DateTimeFormat("pt-BR", {
   month: "long",
   year: "numeric",
+  timeZone: APP_TIME_ZONE,
 });
 
 const weekdayFormatter = new Intl.DateTimeFormat("pt-BR", {
   weekday: "short",
+  timeZone: APP_TIME_ZONE,
 });
 
 const appDateFormatter = new Intl.DateTimeFormat("pt-BR", {
@@ -74,6 +77,12 @@ const getAppDateTimeParts = (value: string | Date) => {
     minute: Number(parts.minute),
     second: Number(parts.second),
   };
+};
+
+export const getAppDateParts = (value: string | Date) => {
+  const { year, month, day } = getAppDateTimeParts(value);
+
+  return { year, month, day };
 };
 
 const getAppTimeZoneOffsetMinutes = (value: string | Date) => {
@@ -160,36 +169,59 @@ export const formatMonthYear = (value: Date) => {
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 };
 
-export const addMonths = (value: Date, amount: number) =>
-  new Date(value.getFullYear(), value.getMonth() + amount, 1);
+export const addMonths = (value: Date, amount: number) => {
+  const parts = getAppDateParts(value);
 
-export const startOfMonth = (value: Date) => new Date(value.getFullYear(), value.getMonth(), 1);
+  return createDateInAppTimeZone({
+    year: parts.year,
+    month: parts.month + amount,
+    day: 1,
+  });
+};
 
-export const endOfMonth = (value: Date) => new Date(value.getFullYear(), value.getMonth() + 1, 0);
+export const startOfMonth = (value: Date) => {
+  const parts = getAppDateParts(value);
+
+  return createDateInAppTimeZone({
+    year: parts.year,
+    month: parts.month,
+    day: 1,
+  });
+};
+
+export const endOfMonth = (value: Date) => {
+  const parts = getAppDateParts(value);
+
+  return createDateInAppTimeZone({
+    year: parts.year,
+    month: parts.month + 1,
+    day: 0,
+  });
+};
 
 export const eachDayOfInterval = (start: Date, end: Date) => {
   const days: Date[] = [];
-  const cursor = new Date(start);
-  cursor.setHours(0, 0, 0, 0);
-  const limit = new Date(end);
-  limit.setHours(0, 0, 0, 0);
+  let cursor = startOfDay(start);
+  const limit = startOfDay(end);
 
   while (cursor <= limit) {
-    days.push(new Date(cursor));
-    cursor.setDate(cursor.getDate() + 1);
+    days.push(cursor);
+    const parts = getAppDateParts(cursor);
+    cursor = createDateInAppTimeZone({
+      year: parts.year,
+      month: parts.month,
+      day: parts.day + 1,
+    });
   }
 
   return days;
 };
 
 export const isSameDay = (left: string | Date, right: string | Date) => {
-  const a = toDate(left);
-  const b = toDate(right);
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+  const a = getAppDateParts(left);
+  const b = getAppDateParts(right);
+
+  return a.year === b.year && a.month === b.month && a.day === b.day;
 };
 
 export const isWithinRange = (target: Date, start: string | Date, end: string | Date) => {
@@ -212,14 +244,22 @@ export const getWeekdayLabel = (date: Date) => {
 
 export const getMonthMatrix = (value: Date) => {
   const firstDay = startOfMonth(value);
-  const offset = firstDay.getDay();
-  const start = new Date(firstDay);
-  start.setDate(firstDay.getDate() - offset);
+  const firstDayParts = getAppDateParts(firstDay);
+  const offset = new Date(Date.UTC(firstDayParts.year, firstDayParts.month - 1, firstDayParts.day)).getUTCDay();
+  const start = createDateInAppTimeZone({
+    year: firstDayParts.year,
+    month: firstDayParts.month,
+    day: firstDayParts.day - offset,
+  });
 
   return Array.from({ length: 42 }, (_, index) => {
-    const day = new Date(start);
-    day.setDate(start.getDate() + index);
-    return day;
+    const startParts = getAppDateParts(start);
+
+    return createDateInAppTimeZone({
+      year: startParts.year,
+      month: startParts.month,
+      day: startParts.day + index,
+    });
   });
 };
 

@@ -3,12 +3,15 @@ import type { Reservation, ReservationStatus, Resource, ResourceStatus } from "@
 import { isWithinRange, toDate } from "./date";
 
 export const RESERVATION_BLOCKING_STATUSES: ReservationStatus[] = [
-  "Pendente",
-  "Aprovada",
+  "Reservado",
   "Em uso",
   "Em atraso",
 ];
-export const RESERVATION_ACTIVE_STATUSES: ReservationStatus[] = ["Aprovada", "Em uso", "Em atraso"];
+export const RESERVATION_ACTIVE_STATUSES: ReservationStatus[] = [
+  "Reservado",
+  "Em uso",
+  "Em atraso",
+];
 
 export const reservationChecklistLabels = {
   vehicleClean: "Veículo limpo",
@@ -24,6 +27,63 @@ export const getResourceById = (resources: Resource[], resourceId?: string) =>
 export const getReservationStatusLabel = (status: ReservationStatus) => reservationStatusLabel[status];
 
 export const getResourceStatusLabel = (status: ResourceStatus) => resourceStatusLabel[status];
+
+type ReservationWindow = Pick<Reservation, "status" | "startDate" | "endDate">;
+
+export interface ResourceReservationSnapshot {
+  resource: Resource;
+  resourceStatus: ResourceStatus;
+  currentReservation?: Reservation;
+  nextReservation?: Reservation;
+  relevantReservation?: Reservation;
+}
+
+export interface ReservationOverview {
+  activeNow: Reservation[];
+  scheduled: Reservation[];
+  actionable: Reservation[];
+  today: Reservation[];
+}
+
+export const hasReservationEnded = (
+  reservation: ReservationWindow,
+  referenceDate: string | Date = new Date()
+) => toDate(reservation.endDate).getTime() < toDate(referenceDate).getTime();
+
+export const isReservationInCurrentWindow = (
+  reservation: ReservationWindow,
+  referenceDate: string | Date = new Date()
+) => {
+  const referenceTime = toDate(referenceDate).getTime();
+  const startTime = toDate(reservation.startDate).getTime();
+  const endTime = toDate(reservation.endDate).getTime();
+
+  return referenceTime >= startTime && referenceTime <= endTime;
+};
+
+export const isScheduledReservationActive = (
+  reservation: ReservationWindow,
+  referenceDate: string | Date = new Date()
+) => reservation.status === "Reservado" && !hasReservationEnded(reservation, referenceDate);
+
+export const isReservationActiveNow = (
+  reservation: ReservationWindow,
+  referenceDate: string | Date = new Date()
+) =>
+  reservation.status === "Em uso" ||
+  reservation.status === "Em atraso" ||
+  (reservation.status === "Reservado" &&
+    isReservationInCurrentWindow(reservation, referenceDate));
+
+export const isReservationScheduledForFuture = (
+  reservation: ReservationWindow,
+  referenceDate: string | Date = new Date()
+) =>
+  reservation.status === "Reservado" &&
+  toDate(reservation.startDate).getTime() > toDate(referenceDate).getTime();
+
+const sortReservationsByStartDate = (left: Reservation, right: Reservation) =>
+  toDate(left.startDate).getTime() - toDate(right.startDate).getTime();
 
 export const overlapsReservation = (
   candidateStart: string,
@@ -64,7 +124,25 @@ export type CalendarDayState = "manutencao" | "emUso" | "reservado" | "disponive
 export const getResourceReservations = (reservations: Reservation[], resourceId: string) =>
   reservations
     .filter((reservation) => reservation.resourceId === resourceId)
-    .sort((left, right) => toDate(left.startDate).getTime() - toDate(right.startDate).getTime());
+    .sort(sortReservationsByStartDate);
+
+export const getCurrentReservation = (
+  resourceId: string,
+  reservations: Reservation[],
+  referenceDate = new Date()
+) =>
+  getResourceReservations(reservations, resourceId).find((reservation) =>
+    isReservationActiveNow(reservation, referenceDate)
+  );
+
+export const getUpcomingReservation = (
+  resourceId: string,
+  reservations: Reservation[],
+  referenceDate = new Date()
+) =>
+  getResourceReservations(reservations, resourceId).find((reservation) =>
+    isReservationScheduledForFuture(reservation, referenceDate)
+  );
 
 export const getReservationsForResourceDay = (
   reservations: Reservation[],
@@ -117,7 +195,7 @@ export const getCalendarDayStateForResource = (
 
   if (
     dayReservations.some((reservation) =>
-      ["Pendente", "Aprovada", "Concluida"].includes(reservation.status)
+      ["Reservado", "Concluida"].includes(reservation.status)
     )
   ) {
     return "reservado";
@@ -171,29 +249,17 @@ export const getCurrentResourceStatus = (
     return "Manutencao";
   }
 
-  const currentReservations = getResourceReservations(reservations, resource.id).filter(
-    (reservation) => reservation.status !== "Cancelada"
-  );
+  const currentReservation = getCurrentReservation(resource.id, reservations, referenceDate);
 
-  if (
-    currentReservations.some(
-      (reservation) => reservation.status === "Em uso" || reservation.status === "Em atraso"
-    )
-  ) {
-    return "Em uso";
+  if (currentReservation) {
+    return currentReservation.status === "Em uso" || currentReservation.status === "Em atraso"
+      ? "Em uso"
+      : "Reservado";
   }
 
-  if (
-    currentReservations.some(
-      (reservation) =>
-        (reservation.status === "Pendente" || reservation.status === "Aprovada") &&
-        isWithinRange(referenceDate, reservation.startDate, reservation.endDate)
-    )
-  ) {
-    return "Reservado";
-  }
+  const upcomingReservation = getUpcomingReservation(resource.id, reservations, referenceDate);
 
-  return "Disponivel";
+  return upcomingReservation ? "Reservado" : "Disponivel";
 };
 
 export const getNextReservation = (
@@ -201,12 +267,25 @@ export const getNextReservation = (
   reservations: Reservation[],
   referenceDate = new Date()
 ) =>
-  getResourceReservations(reservations, resource.id).find(
-    (reservation) =>
-      reservation.status !== "Cancelada" &&
-      reservation.status !== "Concluida" &&
-      toDate(reservation.startDate).getTime() >= referenceDate.getTime()
-  );
+  getUpcomingReservation(resource.id, reservations, referenceDate);
+
+export const getResourceReservationSnapshot = (
+  resource: Resource,
+  reservations: Reservation[],
+  referenceDate = new Date()
+): ResourceReservationSnapshot => {
+  const resourceStatus = getCurrentResourceStatus(resource, reservations, referenceDate);
+  const currentReservation = getCurrentReservation(resource.id, reservations, referenceDate);
+  const nextReservation = getUpcomingReservation(resource.id, reservations, referenceDate);
+
+  return {
+    resource,
+    resourceStatus,
+    currentReservation,
+    nextReservation,
+    relevantReservation: currentReservation ?? nextReservation,
+  };
+};
 
 export const getResourceAvailabilityForDate = (
   resource: Resource,
@@ -242,10 +321,44 @@ export const getFleetSummary = (
   };
 };
 
+export const getReservationOverview = (
+  reservations: Reservation[],
+  referenceDate = new Date()
+): ReservationOverview => {
+  const sortedReservations = [...reservations].sort(sortReservationsByStartDate);
+
+  return {
+    activeNow: sortedReservations.filter((reservation) =>
+      isReservationActiveNow(reservation, referenceDate)
+    ),
+    scheduled: sortedReservations.filter((reservation) =>
+      isReservationScheduledForFuture(reservation, referenceDate)
+    ),
+    actionable: sortedReservations.filter(
+      (reservation) =>
+        reservation.status === "Em uso" ||
+        reservation.status === "Em atraso" ||
+        isScheduledReservationActive(reservation, referenceDate)
+    ),
+    today: sortedReservations.filter(
+      (reservation) =>
+        reservation.status !== "Cancelada" &&
+        isWithinRange(toDate(referenceDate), reservation.startDate, reservation.endDate)
+    ),
+  };
+};
+
+export const getActionableReservationsForUser = (
+  reservations: Reservation[],
+  userId: string,
+  referenceDate = new Date()
+) =>
+  getReservationOverview(reservations, referenceDate).actionable.filter(
+    (reservation) => reservation.userId === userId
+  );
+
 export const getSummaryCounts = (resources: Resource[], reservations: Reservation[]) => ({
   availableResources: getFleetSummary(resources, reservations).available,
-  activeReservations: reservations.filter((item) =>
-    ["Pendente", "Aprovada", "Em uso", "Em atraso"].includes(item.status)
-  ).length,
+  activeReservations: getReservationOverview(reservations).actionable.length,
   maintenanceResources: getFleetSummary(resources, reservations).maintenance,
 });

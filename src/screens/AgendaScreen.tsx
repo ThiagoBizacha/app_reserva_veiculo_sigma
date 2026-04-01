@@ -7,11 +7,15 @@ import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import {
   addMonths,
+  createDateInAppTimeZone,
   formatDate,
   formatDateTime,
   formatMonthYear,
+  getAppDateParts,
   getMonthMatrix,
   isSameDay,
+  startOfDay,
+  startOfMonth,
 } from "@/utils/date";
 import { getCalendarDayStateForResource } from "@/utils/reservations";
 import { CalendarDayCell } from "@/components/CalendarDayCell";
@@ -52,6 +56,7 @@ const availabilityCopy = {
 export function AgendaScreen({ initialResourceId }: AgendaScreenProps) {
   const {
     resources,
+    getActionableReservations,
     getAvailabilityForDate,
     getReservationsForDay,
     getReservationsForResource,
@@ -59,17 +64,25 @@ export function AgendaScreen({ initialResourceId }: AgendaScreenProps) {
   } = useReservationStore();
   const vehicles = resources.filter((resource) => resource.category === "Veiculo");
   const today = new Date();
-  const initialVehicle = vehicles.find((resource) => resource.id === initialResourceId) ?? vehicles[0];
+  const nextActionableReservation = getActionableReservations()[0];
+  const initialContextDate = nextActionableReservation
+    ? new Date(nextActionableReservation.startDate)
+    : today;
+  const initialVehicle =
+    vehicles.find((resource) => resource.id === initialResourceId) ??
+    vehicles.find((resource) => resource.id === nextActionableReservation?.resourceId) ??
+    vehicles[0];
 
   const [selectedResourceId, setSelectedResourceId] = useState(initialVehicle?.id ?? "");
-  const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
-  const [selectedDate, setSelectedDate] = useState(today);
+  const [currentMonth, setCurrentMonth] = useState(startOfMonth(initialContextDate));
+  const [selectedDate, setSelectedDate] = useState(startOfDay(initialContextDate));
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
 
   const selectedResource = vehicles.find((resource) => resource.id === selectedResourceId) ?? vehicles[0];
   const selectedResourceStatus = selectedResource
     ? getResourceStatus(selectedResource.id, selectedDate)
     : "Disponivel";
+  const currentMonthParts = getAppDateParts(currentMonth);
   const monthMatrix = useMemo(() => getMonthMatrix(currentMonth), [currentMonth]);
   const calendarRows = useMemo(
     () => Array.from({ length: 6 }, (_, index) => monthMatrix.slice(index * 7, index * 7 + 7)),
@@ -86,19 +99,31 @@ export function AgendaScreen({ initialResourceId }: AgendaScreenProps) {
     : { state: "disponivel" as const, reservations: [], isAvailable: false };
   const dayCard = availabilityCopy[selectedDayAvailability.state];
 
-  const selectedDayStart = new Date(selectedDate);
-  selectedDayStart.setHours(0, 0, 0, 0);
-  const todayStart = new Date(today);
-  todayStart.setHours(0, 0, 0, 0);
+  const selectedDayStart = startOfDay(selectedDate);
+  const todayStart = startOfDay(today);
   const isPastDay = selectedDayStart < todayStart;
 
   const handleMonthChange = (offset: number) => {
     const nextMonth = addMonths(currentMonth, offset);
-    const maxDay = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
-    const targetDay = Math.min(selectedDate.getDate(), maxDay);
+    const nextMonthParts = getAppDateParts(nextMonth);
+    const selectedDateParts = getAppDateParts(selectedDate);
+    const maxDay = getAppDateParts(
+      createDateInAppTimeZone({
+        year: nextMonthParts.year,
+        month: nextMonthParts.month + 1,
+        day: 0,
+      })
+    ).day;
+    const targetDay = Math.min(selectedDateParts.day, maxDay);
 
     setCurrentMonth(nextMonth);
-    setSelectedDate(new Date(nextMonth.getFullYear(), nextMonth.getMonth(), targetDay));
+    setSelectedDate(
+      createDateInAppTimeZone({
+        year: nextMonthParts.year,
+        month: nextMonthParts.month,
+        day: targetDay,
+      })
+    );
   };
 
   const handleOpenNewReservation = () => {
@@ -111,6 +136,19 @@ export function AgendaScreen({ initialResourceId }: AgendaScreenProps) {
       params: { resourceId: selectedResource.id, date: selectedDate.toISOString() },
     });
   };
+
+  if (vehicles.length === 0) {
+    return (
+      <ScreenContainer>
+        <PageHeader title="Agenda" />
+        <EmptyState
+          icon="truck"
+          title="Nenhum veículo cadastrado"
+          description="Cadastre veículos na frota para começar a consultar disponibilidade e criar reservas."
+        />
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer>
@@ -172,8 +210,8 @@ export function AgendaScreen({ initialResourceId }: AgendaScreenProps) {
               {row.map((day) => (
                 <View key={day.toISOString()} style={styles.gridCell}>
                   <CalendarDayCell
-                    dayNumber={day.getDate()}
-                    isCurrentMonth={day.getMonth() === currentMonth.getMonth()}
+                    dayNumber={getAppDateParts(day).day}
+                    isCurrentMonth={getAppDateParts(day).month === currentMonthParts.month}
                     isSelected={isSameDay(day, selectedDate)}
                     isToday={isSameDay(day, today)}
                     state={

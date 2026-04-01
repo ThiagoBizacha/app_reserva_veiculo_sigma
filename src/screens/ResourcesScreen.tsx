@@ -2,11 +2,14 @@
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { PageHeader, ScreenContainer, VehicleDocumentPreviewModal } from "@/components";
+import { EmptyState, PageHeader, ScreenContainer, VehicleDocumentPreviewModal } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
-import { formatDate, isWithinRange } from "@/utils/date";
-import { getNextReservation, getResourceStatusLabel } from "@/utils/reservations";
+import { formatDate } from "@/utils/date";
+import {
+  getResourceReservationSnapshot,
+  getResourceStatusLabel,
+} from "@/utils/reservations";
 import type { Resource, ResourceStatus } from "@/types";
 
 type FleetFilter = "Todos" | "Disponivel" | "Reservado" | "Em uso" | "Manutencao";
@@ -27,7 +30,7 @@ const statusMeta: Record<ResourceStatus, { color: string; action: string }> = {
 };
 
 export function ResourcesScreen() {
-  const { resources, reservations, getResourceStatus } = useReservationStore();
+  const { resources, reservations } = useReservationStore();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FleetFilter>("Todos");
   const [documentResource, setDocumentResource] = useState<Resource | null>(null);
@@ -35,33 +38,36 @@ export function ResourcesScreen() {
   const vehicles = resources.filter((item) => item.category === "Veiculo");
   const vehicleItems = useMemo(
     () =>
-      vehicles.map((resource) => {
-        const computedStatus = getResourceStatus(resource.id);
-        const nextReservation = getNextReservation(resource, reservations);
-        const currentReservation =
-          reservations.find(
-            (reservation) =>
-              reservation.resourceId === resource.id &&
-              (reservation.status === "Em uso" || reservation.status === "Em atraso")
-          ) ??
-          reservations.find(
-            (reservation) =>
-              reservation.resourceId === resource.id &&
-              ["Pendente", "Aprovada"].includes(reservation.status) &&
-              isWithinRange(new Date(), reservation.startDate, reservation.endDate)
-          );
+      [...vehicles]
+        .map((resource) => {
+          const snapshot = getResourceReservationSnapshot(resource, reservations);
 
-        return {
-          resource,
-          computedStatus,
-          nextReservation,
-          currentReservation,
-        };
-      }),
-    [getResourceStatus, reservations, vehicles]
+          return {
+            ...snapshot,
+            computedStatus: snapshot.resourceStatus,
+          };
+        })
+        .sort((left, right) => {
+          const leftPriority = left.currentReservation ? 0 : left.nextReservation ? 1 : 2;
+          const rightPriority = right.currentReservation ? 0 : right.nextReservation ? 1 : 2;
+
+          if (leftPriority !== rightPriority) {
+            return leftPriority - rightPriority;
+          }
+
+          if (left.relevantReservation && right.relevantReservation) {
+            return (
+              new Date(left.relevantReservation.startDate).getTime() -
+              new Date(right.relevantReservation.startDate).getTime()
+            );
+          }
+
+          return left.resource.name.localeCompare(right.resource.name, "pt-BR");
+        }),
+    [reservations, vehicles]
   );
 
-  const filtered = vehicleItems.filter(({ resource, computedStatus }) => {
+  const filtered = vehicleItems.filter(({ resource, computedStatus, currentReservation, nextReservation }) => {
     const query = search.trim().toLowerCase();
     const matchesSearch =
       !query ||
@@ -71,10 +77,13 @@ export function ResourcesScreen() {
       resource.plate?.toLowerCase().includes(query) ||
       resource.model?.toLowerCase().includes(query) ||
       resource.brand?.toLowerCase().includes(query) ||
-      resource.rentalCompany?.toLowerCase().includes(query);
+      resource.rentalCompany?.toLowerCase().includes(query) ||
+      currentReservation?.code.toLowerCase().includes(query) ||
+      nextReservation?.code.toLowerCase().includes(query);
     const matchesFilter = filter === "Todos" || computedStatus === filter;
     return matchesSearch && matchesFilter;
   });
+  const hasSearchQuery = search.trim().length > 0;
 
   const counts = {
     Todos: vehicleItems.length,
@@ -157,105 +166,156 @@ export function ResourcesScreen() {
       </ScrollView>
 
       <View style={styles.list}>
-        {filtered.map(({ resource, computedStatus, nextReservation, currentReservation }) => (
-          <View key={resource.id} style={styles.vehicleCard}>
-            <View style={[styles.cardBorder, { backgroundColor: statusMeta[computedStatus].color }]} />
-
-            <View style={styles.cardTop}>
-              <View style={styles.titleRow}>
-                <Feather name="truck" size={20} color={colors.textMuted} />
-                <Text style={styles.vehicleName}>{resource.name}</Text>
-              </View>
+        {filtered.length === 0 ? (
+          <EmptyState
+            icon="search"
+            title={hasSearchQuery ? "Nenhum veículo encontrado" : "Nenhum veículo neste filtro"}
+            description={
+              hasSearchQuery
+                ? "Tente buscar por outro nome, placa, locadora ou limpe a pesquisa para ver toda a frota."
+                : "Ajuste o status selecionado para visualizar outros veículos da frota."
+            }
+          />
+        ) : (
+          filtered.map(({ resource, computedStatus, nextReservation, currentReservation }) => (
+            <View key={resource.id} style={styles.vehicleCard}>
               <View
-                style={[styles.statusPill, { backgroundColor: statusMeta[computedStatus].color }]}
-              >
-                <Text style={styles.statusPillText}>
-                  {getResourceStatusLabel(computedStatus)}
-                </Text>
+                style={[styles.cardBorder, { backgroundColor: statusMeta[computedStatus].color }]}
+              />
+
+              <View style={styles.cardTop}>
+                <View style={styles.titleRow}>
+                  <Feather name="truck" size={20} color={colors.textMuted} />
+                  <Text style={styles.vehicleName}>{resource.name}</Text>
+                </View>
+                <View
+                  style={[
+                    styles.statusPill,
+                    { backgroundColor: statusMeta[computedStatus].color },
+                  ]}
+                >
+                  <Text style={styles.statusPillText}>
+                    {getResourceStatusLabel(computedStatus)}
+                  </Text>
+                </View>
               </View>
-            </View>
 
-            <View style={styles.metaGrid}>
-              <Text style={styles.metaText}>
-                Placa: {resource.plate ?? "-"} | Código: {resource.code}
-              </Text>
-              <Text style={styles.metaText}>
-                {resource.brand ?? "-"} {resource.model ?? ""} | {resource.year ?? "-"} | {resource.vehicleCategory ?? "-"}
-              </Text>
-              <Text style={styles.metaText}>
-                Locadora: {resource.rentalCompany ?? "-"} | Km atual: {resource.currentMileage ?? "-"}
-              </Text>
-              {computedStatus === "Disponivel" && nextReservation ? (
+              <View style={styles.metaGrid}>
+                <Text style={styles.metaText}>Placa: {resource.plate ?? "-"}</Text>
                 <Text style={styles.metaText}>
-                  Próxima reserva: {formatDate(nextReservation.startDate)}
+                  {resource.brand ?? "-"} {resource.model ?? ""} | {resource.year ?? "-"} |{" "}
+                  {resource.vehicleCategory ?? "-"}
                 </Text>
-              ) : null}
-              {computedStatus === "Reservado" && currentReservation ? (
                 <Text style={styles.metaText}>
-                  Reserva ativa: {formatDate(currentReservation.startDate)} até{" "}
-                  {formatDate(currentReservation.endDate)}
+                  Locadora: {resource.rentalCompany ?? "-"} | Km atual:{" "}
+                  {resource.currentMileage ?? "-"}
                 </Text>
-              ) : null}
-              {computedStatus === "Em uso" && currentReservation ? (
-                <Text style={styles.metaText}>Em uso até: {formatDate(currentReservation.endDate)}</Text>
-              ) : null}
-              {computedStatus === "Manutencao" ? (
-                <Text style={styles.metaText}>
-                  Retorno previsto: {resource.nextAvailableAt ? formatDate(resource.nextAvailableAt) : "A definir"}
-                </Text>
-              ) : null}
-              {resource.nextMaintenanceDate ? (
-                <Text style={styles.metaText}>
-                  Próxima manutenção: {formatDate(resource.nextMaintenanceDate)} | Km {resource.nextMaintenanceMileage ?? "-"}
-                </Text>
-              ) : null}
-            </View>
+                {computedStatus === "Disponivel" && nextReservation ? (
+                  <>
+                    <Text style={styles.reservationCodeText}>
+                      Código da próxima reserva: {nextReservation.code}
+                    </Text>
+                    <Text style={styles.metaText}>
+                      Agendada para: {formatDate(nextReservation.startDate)}
+                    </Text>
+                  </>
+                ) : null}
+                {computedStatus === "Reservado" && (currentReservation || nextReservation) ? (
+                  <>
+                    <Text style={styles.reservationCodeText}>
+                      Código da reserva: {(currentReservation ?? nextReservation)?.code}
+                    </Text>
+                    <Text style={styles.metaText}>
+                      {currentReservation
+                        ? `Reservado até: ${formatDate(currentReservation.endDate)}`
+                        : `Agendado para: ${formatDate(nextReservation!.startDate)}`}
+                    </Text>
+                  </>
+                ) : null}
+                {computedStatus === "Em uso" && currentReservation ? (
+                  <>
+                    <Text style={styles.reservationCodeText}>
+                      Código da reserva: {currentReservation.code}
+                    </Text>
+                    <Text style={styles.metaText}>
+                      Em uso até: {formatDate(currentReservation.endDate)}
+                    </Text>
+                  </>
+                ) : null}
+                {computedStatus === "Manutencao" ? (
+                  <Text style={styles.metaText}>
+                    Retorno previsto:{" "}
+                    {resource.nextAvailableAt ? formatDate(resource.nextAvailableAt) : "A definir"}
+                  </Text>
+                ) : null}
+                {resource.nextMaintenanceDate ? (
+                  <Text style={styles.metaText}>
+                    Próxima manutenção: {formatDate(resource.nextMaintenanceDate)} | Km{" "}
+                    {resource.nextMaintenanceMileage ?? "-"}
+                  </Text>
+                ) : null}
+              </View>
 
-            <View style={styles.utilityActionsRow}>
-              <Pressable
-                style={[styles.actionButton, styles.secondaryAction]}
-                onPress={() => openDetail(resource.id)}
-              >
-                <Text style={[styles.actionButtonText, styles.secondaryActionText]}>Ver detalhes</Text>
-              </Pressable>
+              <View style={styles.utilityActionsRow}>
+                <Pressable
+                  style={[styles.actionButton, styles.secondaryAction]}
+                  onPress={() => openDetail(resource.id)}
+                >
+                  <Text style={[styles.actionButtonText, styles.secondaryActionText]}>
+                    Ver detalhes
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.actionButton,
+                    styles.secondaryAction,
+                    !resource.vehicleDocumentAttachment && styles.disabledAction,
+                  ]}
+                  onPress={() => openDocumentPreview(resource)}
+                  disabled={!resource.vehicleDocumentAttachment}
+                >
+                  <View style={styles.inlineActionContent}>
+                    <Feather
+                      name="file-text"
+                      size={16}
+                      color={
+                        resource.vehicleDocumentAttachment
+                          ? colors.textSecondary
+                          : colors.textMuted
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.actionButtonText,
+                        styles.secondaryActionText,
+                        !resource.vehicleDocumentAttachment && styles.disabledActionText,
+                      ]}
+                    >
+                      Ver PDF
+                    </Text>
+                  </View>
+                </Pressable>
+              </View>
+
               <Pressable
                 style={[
                   styles.actionButton,
-                  styles.secondaryAction,
-                  !resource.vehicleDocumentAttachment && styles.disabledAction,
+                  styles.primaryActionButton,
+                  { backgroundColor: statusMeta[computedStatus].color },
                 ]}
-                onPress={() => openDocumentPreview(resource)}
-                disabled={!resource.vehicleDocumentAttachment}
+                onPress={() =>
+                  handleAction(
+                    computedStatus,
+                    resource.id,
+                    currentReservation?.id ?? nextReservation?.id
+                  )
+                }
               >
-                <View style={styles.inlineActionContent}>
-                  <Feather
-                    name="file-text"
-                    size={16}
-                    color={resource.vehicleDocumentAttachment ? colors.textSecondary : colors.textMuted}
-                  />
-                  <Text
-                    style={[
-                      styles.actionButtonText,
-                      styles.secondaryActionText,
-                      !resource.vehicleDocumentAttachment && styles.disabledActionText,
-                    ]}
-                  >
-                    Ver PDF
-                  </Text>
-                </View>
+                <Text style={styles.actionButtonText}>{statusMeta[computedStatus].action}</Text>
               </Pressable>
             </View>
-
-            <Pressable
-              style={[styles.actionButton, styles.primaryActionButton, { backgroundColor: statusMeta[computedStatus].color }]}
-              onPress={() =>
-                handleAction(computedStatus, resource.id, currentReservation?.id ?? nextReservation?.id)
-              }
-            >
-              <Text style={styles.actionButtonText}>{statusMeta[computedStatus].action}</Text>
-            </Pressable>
-          </View>
-        ))}
+          ))
+        )}
       </View>
 
       <VehicleDocumentPreviewModal
@@ -386,6 +446,11 @@ const styles = StyleSheet.create({
   metaText: {
     color: colors.textSecondary,
     fontSize: typography.bodySmall,
+  },
+  reservationCodeText: {
+    color: colors.primaryDark,
+    fontSize: typography.bodySmall,
+    fontWeight: "700",
   },
   utilityActionsRow: {
     flexDirection: "row",

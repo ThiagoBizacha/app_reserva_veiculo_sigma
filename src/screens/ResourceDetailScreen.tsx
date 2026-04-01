@@ -14,14 +14,14 @@ import {
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, spacing, typography } from "@/theme";
 import { formatDateTime } from "@/utils/date";
-import { getNextReservation } from "@/utils/reservations";
+import { getResourceReservationSnapshot } from "@/utils/reservations";
 
 interface ResourceDetailScreenProps {
   resourceId: string;
 }
 
 export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) {
-  const { resources, reservations, getResourceStatus } = useReservationStore();
+  const { resources, reservations } = useReservationStore();
   const resource = resources.find((item) => item.id === resourceId);
 
   if (!resource) {
@@ -36,11 +36,12 @@ export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) 
     );
   }
 
-  const computedStatus = getResourceStatus(resource.id);
+  const snapshot = getResourceReservationSnapshot(resource, reservations);
+  const computedStatus = snapshot.resourceStatus;
   const relatedReservations = reservations
     .filter((reservation) => reservation.resourceId === resource.id)
     .slice(0, 3);
-  const nextReservation = getNextReservation(resource, reservations);
+  const nextReservation = snapshot.nextReservation;
 
   return (
     <ScreenContainer
@@ -96,6 +97,7 @@ export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) 
 
         {nextReservation ? (
           <MetaBlock label="Próxima reserva">
+            <Text style={styles.metaValue}>Código da reserva: {nextReservation.code}</Text>
             <Text style={styles.metaValue}>
               {formatDateTime(nextReservation.startDate)} até {formatDateTime(nextReservation.endDate)}
             </Text>

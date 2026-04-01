@@ -21,6 +21,7 @@ import {
   getTravelDistance,
   requiredPhotoSlots,
 } from "@/utils/operation";
+import { isScheduledReservationActive } from "@/utils/reservations";
 import type { ReservationInspection } from "@/types";
 
 interface ReservationDetailScreenProps {
@@ -53,6 +54,8 @@ export function ReservationDetailScreen({ reservationId }: ReservationDetailScre
 
   const resource = resources.find((item) => item.id === reservation.resourceId);
   const requester = users.find((item) => item.id === reservation.userId);
+  const canStartCheckIn = reservation.status === "Reservado" && isScheduledReservationActive(reservation);
+  const canCancelReservation = reservation.status === "Reservado" && isScheduledReservationActive(reservation);
 
   const handleCancelReservation = () => {
     const result = cancelReservation(reservation.id);
@@ -104,7 +107,7 @@ export function ReservationDetailScreen({ reservationId }: ReservationDetailScre
         />
       ) : null}
 
-      {reservation.status === "Aprovada" ? (
+      {canStartCheckIn ? (
         <PrimaryButton label="Abrir vistoria de saída" onPress={() => openOperation("checkin")} />
       ) : null}
 
@@ -112,7 +115,7 @@ export function ReservationDetailScreen({ reservationId }: ReservationDetailScre
         <PrimaryButton label="Registrar devolução" onPress={() => openOperation("checkout")} />
       ) : null}
 
-      {reservation.status === "Aprovada" || reservation.status === "Pendente" ? (
+      {canCancelReservation ? (
         <SecondaryButton label="Cancelar reserva" onPress={handleCancelReservation} />
       ) : null}
 

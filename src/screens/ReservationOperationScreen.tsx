@@ -33,7 +33,7 @@ import {
   parseMileageValue,
   requiredPhotoSlots,
 } from "@/utils/operation";
-import { getResourceById } from "@/utils/reservations";
+import { getResourceById, isScheduledReservationActive } from "@/utils/reservations";
 import type {
   FuelLevel,
   OperationPhoto,
@@ -139,7 +139,9 @@ export function ReservationOperationScreen({
   const title =
     resolvedMode === "checkin" ? "Vistoria de Saída" : "Check-in de Devolução";
   const modeAllowed =
-    (resolvedMode === "checkin" && reservation?.status === "Aprovada") ||
+    (resolvedMode === "checkin" &&
+      reservation?.status === "Reservado" &&
+      isScheduledReservationActive(reservation)) ||
     (resolvedMode === "checkout" && reservation?.status === "Em uso");
   const requiredPhotoCount = getRequiredPhotoCount(requiredPhotos);
   const startMileage = reservation?.startMileage;

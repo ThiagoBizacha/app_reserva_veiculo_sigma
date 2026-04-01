@@ -32,8 +32,7 @@ export const statusColors = {
     Manutencao: "#D64545",
   },
   reservation: {
-    Pendente: "#E59A2F",
-    Aprovada: "#2F8F3A",
+    Reservado: "#5E8DEE",
     "Em uso": "#E59A2F",
     Concluida: "#1F4D12",
     Cancelada: "#8B948D",

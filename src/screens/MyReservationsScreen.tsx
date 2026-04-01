@@ -6,22 +6,16 @@ import { EmptyState, PageHeader, ScreenContainer, StatusBadge } from "@/componen
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import { formatDateTime } from "@/utils/date";
-import { getResourceById } from "@/utils/reservations";
+import { getResourceById, isScheduledReservationActive } from "@/utils/reservations";
 import type { ReservationStatus } from "@/types";
 
 type ReservationFilter = "Ativas" | "Em uso" | "Concluídas" | "Canceladas";
-
-const filterMap: Record<ReservationFilter, ReservationStatus[]> = {
-  Ativas: ["Pendente", "Aprovada"],
-  "Em uso": ["Em uso", "Em atraso"],
-  Concluídas: ["Concluida"],
-  Canceladas: ["Cancelada"],
-};
 
 export function MyReservationsScreen() {
   const { currentUserId, reservations, resources, cancelReservation } = useReservationStore();
   const [filter, setFilter] = useState<ReservationFilter>("Ativas");
   const [feedback, setFeedback] = useState<string | null>(null);
+  const referenceDate = new Date();
 
   const myReservations = useMemo(
     () =>
@@ -32,15 +26,26 @@ export function MyReservationsScreen() {
   );
 
   const filteredReservations = useMemo(
-    () => myReservations.filter((reservation) => filterMap[filter].includes(reservation.status)),
-    [filter, myReservations]
+    () =>
+      myReservations.filter((reservation) =>
+        matchesReservationFilter(reservation, filter, referenceDate)
+      ),
+    [filter, myReservations, referenceDate]
   );
 
   const counts = {
-    Ativas: myReservations.filter((reservation) => filterMap.Ativas.includes(reservation.status)).length,
-    "Em uso": myReservations.filter((reservation) => filterMap["Em uso"].includes(reservation.status)).length,
-    Concluídas: myReservations.filter((reservation) => filterMap.Concluídas.includes(reservation.status)).length,
-    Canceladas: myReservations.filter((reservation) => filterMap.Canceladas.includes(reservation.status)).length,
+    Ativas: myReservations.filter((reservation) =>
+      matchesReservationFilter(reservation, "Ativas", referenceDate)
+    ).length,
+    "Em uso": myReservations.filter((reservation) =>
+      matchesReservationFilter(reservation, "Em uso", referenceDate)
+    ).length,
+    Concluídas: myReservations.filter((reservation) =>
+      matchesReservationFilter(reservation, "Concluídas", referenceDate)
+    ).length,
+    Canceladas: myReservations.filter((reservation) =>
+      matchesReservationFilter(reservation, "Canceladas", referenceDate)
+    ).length,
   };
 
   const openOperation = (reservationId: string, mode: "checkin" | "checkout") => {
@@ -58,7 +63,7 @@ export function MyReservationsScreen() {
   };
 
   const handleReservationAction = (reservationId: string, status: ReservationStatus) => {
-    if (status === "Aprovada") {
+    if (status === "Reservado") {
       openOperation(reservationId, "checkin");
       return;
     }
@@ -68,10 +73,8 @@ export function MyReservationsScreen() {
       return;
     }
 
-    if (status === "Pendente") {
-      const result = cancelReservation(reservationId);
-      setFeedback(result.message);
-    }
+    const result = cancelReservation(reservationId);
+    setFeedback(result.message);
   };
 
   return (
@@ -117,13 +120,11 @@ export function MyReservationsScreen() {
           filteredReservations.map((reservation) => {
             const resource = getResourceById(resources, reservation.resourceId);
             const actionLabel =
-              reservation.status === "Pendente"
-                ? "Cancelar reserva"
-                : reservation.status === "Aprovada"
-                  ? "Iniciar vistoria de saída"
-                  : reservation.status === "Em uso"
-                    ? "Registrar devolução"
-                    : undefined;
+              reservation.status === "Reservado"
+                ? "Iniciar vistoria de saída"
+                : reservation.status === "Em uso"
+                  ? "Registrar devolução"
+                  : undefined;
 
             return (
               <View key={reservation.id} style={styles.card}>
@@ -158,20 +159,10 @@ export function MyReservationsScreen() {
 
                   {actionLabel ? (
                     <Pressable
-                      style={[
-                        styles.actionButton,
-                        reservation.status === "Pendente" ? styles.dangerAction : styles.primaryAction,
-                      ]}
+                      style={[styles.actionButton, styles.primaryAction]}
                       onPress={() => handleReservationAction(reservation.id, reservation.status)}
                     >
-                      <Text
-                        style={[
-                          styles.actionButtonText,
-                          reservation.status === "Pendente" && styles.dangerActionText,
-                        ]}
-                      >
-                        {actionLabel}
-                      </Text>
+                      <Text style={styles.actionButtonText}>{actionLabel}</Text>
                     </Pressable>
                   ) : null}
                 </View>
@@ -186,6 +177,26 @@ export function MyReservationsScreen() {
       </Pressable>
     </ScreenContainer>
   );
+}
+
+function matchesReservationFilter(
+  reservation: { endDate: string; startDate: string; status: ReservationStatus },
+  filter: ReservationFilter,
+  referenceDate: Date
+) {
+  if (filter === "Ativas") {
+    return isScheduledReservationActive(reservation, referenceDate);
+  }
+
+  if (filter === "Em uso") {
+    return reservation.status === "Em uso" || reservation.status === "Em atraso";
+  }
+
+  if (filter === "Concluídas") {
+    return reservation.status === "Concluida";
+  }
+
+  return reservation.status === "Cancelada";
 }
 
 function InfoRow({ icon, text }: { icon: keyof typeof Feather.glyphMap; text: string }) {
