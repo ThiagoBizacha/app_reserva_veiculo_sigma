@@ -10,12 +10,10 @@ import { colors, radius, shadows, spacing, typography } from "@/theme";
 import type { User } from "@/types";
 
 export function HomeScreen() {
-  const { currentUser, currentUserName, reservations, getActionableReservations, getSummary } =
-    useReservationStore();
+  const { currentUser, currentUserName, reservations, getSummary } = useReservationStore();
   const insets = useSafeAreaInsets();
   const [licenseUser, setLicenseUser] = useState<User | null>(null);
   const summary = getSummary();
-  const actionableReservations = getActionableReservations();
   const myOpenReservations = reservations.filter(
     (reservation) =>
       reservation.userId === currentUser.id &&
@@ -97,63 +95,45 @@ export function HomeScreen() {
               Centro de Custo: {requesterCostCenter} | Gestor: {requesterManagerName}
             </Text>
 
-            <View style={styles.licenseCard}>
-              <View style={styles.licenseTitleRow}>
-                <Feather name="credit-card" size={16} color={colors.primaryDark} />
-                <Text style={styles.licenseTitle}>CNH digital</Text>
-              </View>
-
-              <View style={styles.licenseActions}>
-                <View
+            <View style={styles.licenseInline}>
+              <View
+                style={[
+                  styles.licenseStatusBadge,
+                  isLicenseValid
+                    ? styles.licenseStatusBadgeValid
+                    : styles.licenseStatusBadgeExpired,
+                ]}
+              >
+                <Text
                   style={[
-                    styles.licenseStatusBadge,
+                    styles.licenseStatusBadgeText,
                     isLicenseValid
-                      ? styles.licenseStatusBadgeValid
-                      : styles.licenseStatusBadgeExpired,
+                      ? styles.licenseStatusBadgeTextValid
+                      : styles.licenseStatusBadgeTextExpired,
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.licenseStatusBadgeText,
-                      isLicenseValid
-                        ? styles.licenseStatusBadgeTextValid
-                        : styles.licenseStatusBadgeTextExpired,
-                    ]}
-                  >
-                    {cnhStatusLabel}
-                  </Text>
-                </View>
-
-                <Pressable
-                  style={[
-                    styles.licenseAction,
-                    !currentUser.cnhAnexo && styles.licenseActionDisabled,
-                  ]}
-                  onPress={() => setLicenseUser(currentUser)}
-                  disabled={!currentUser.cnhAnexo}
-                >
-                  <Feather
-                    name="file-text"
-                    size={14}
-                    color={currentUser.cnhAnexo ? colors.primaryDark : colors.textMuted}
-                  />
-                  <Text
-                    style={[
-                      styles.licenseActionText,
-                      !currentUser.cnhAnexo && styles.licenseActionTextDisabled,
-                    ]}
-                  >
-                    Ver PDF
-                  </Text>
-                </Pressable>
+                  {cnhStatusLabel}
+                </Text>
               </View>
-            </View>
-          </View>
 
-          <View style={styles.summaryRow}>
-            <SummaryCard label="Reservas ativas" value={myOpenReservations} />
-            <SummaryCard label="Veículos livres" value={summary.available} />
-            <SummaryCard label="Operações" value={actionableReservations.length} />
+              <Pressable
+                style={[
+                  styles.licenseAction,
+                  !currentUser.cnhAnexo && styles.licenseActionDisabled,
+                ]}
+                onPress={() => setLicenseUser(currentUser)}
+                disabled={!currentUser.cnhAnexo}
+              >
+                <Text
+                  style={[
+                    styles.licenseActionText,
+                    !currentUser.cnhAnexo && styles.licenseActionTextDisabled,
+                  ]}
+                >
+                  Ver CNH
+                </Text>
+              </Pressable>
+            </View>
           </View>
 
           <Pressable style={styles.primaryCard} onPress={() => router.push("/(tabs)/agenda")}>
@@ -203,15 +183,6 @@ export function HomeScreen() {
 
       <DriverLicensePreviewModal user={licenseUser} onClose={() => setLicenseUser(null)} />
     </ScreenContainer>
-  );
-}
-
-function SummaryCard({ label, value }: { label: string; value: number }) {
-  return (
-    <View style={styles.summaryCard}>
-      <Text style={styles.summaryValue}>{value}</Text>
-      <Text style={styles.summaryLabel}>{label}</Text>
-    </View>
   );
 }
 
@@ -315,33 +286,12 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: typography.caption,
   },
-  licenseCard: {
-    marginTop: spacing.xs,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    padding: spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
-  licenseTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    flex: 1,
-  },
-  licenseTitle: {
-    color: colors.primaryDark,
-    fontSize: typography.body,
-    fontWeight: "700",
-  },
-  licenseActions: {
+  licenseInline: {
+    marginTop: spacing.sm,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
+    flexWrap: "wrap",
   },
   licenseStatusBadge: {
     paddingHorizontal: spacing.sm,
@@ -365,15 +315,13 @@ const styles = StyleSheet.create({
     color: colors.danger,
   },
   licenseAction: {
-    minHeight: 38,
+    minHeight: 36,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: "#C9DDC0",
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row",
-    gap: spacing.xs,
     paddingHorizontal: spacing.md,
   },
   licenseActionDisabled: {
@@ -387,31 +335,6 @@ const styles = StyleSheet.create({
   },
   licenseActionTextDisabled: {
     color: colors.textMuted,
-  },
-  summaryRow: {
-    flexDirection: "row",
-    gap: spacing.sm,
-  },
-  summaryCard: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    gap: spacing.xxs,
-  },
-  summaryValue: {
-    color: colors.primaryDark,
-    fontSize: typography.section,
-    fontWeight: "700",
-  },
-  summaryLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.caption,
-    textAlign: "center",
   },
   primaryCard: {
     backgroundColor: colors.primarySoft,

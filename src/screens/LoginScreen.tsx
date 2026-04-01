@@ -9,10 +9,10 @@ import {
   Platform,
   Pressable,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
@@ -26,6 +26,7 @@ interface LoginFieldProps {
   onChangeText: (value: string) => void;
   secureTextEntry?: boolean;
   trailing?: ReactNode;
+  compact?: boolean;
 }
 
 function LoginField({
@@ -35,9 +36,10 @@ function LoginField({
   onChangeText,
   secureTextEntry,
   trailing,
+  compact = false,
 }: LoginFieldProps) {
   return (
-    <View style={styles.fieldShell}>
+    <View style={[styles.fieldShell, compact && styles.fieldShellCompact]}>
       <Feather name={icon} size={18} color={colors.textMuted} />
       <TextInput
         value={value}
@@ -47,7 +49,7 @@ function LoginField({
         secureTextEntry={secureTextEntry}
         autoCapitalize="none"
         autoCorrect={false}
-        style={styles.input}
+        style={[styles.input, compact && styles.inputCompact]}
       />
       {trailing}
     </View>
@@ -55,9 +57,15 @@ function LoginField({
 }
 
 export function LoginScreen() {
+  const { height, width } = useWindowDimensions();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const isCompact = height <= 780;
+  const isShort = height <= 700;
+  const heroHeight = isShort ? 200 : isCompact ? 236 : 288;
+  const logoWidth = Math.min(width * 0.62, isShort ? 240 : isCompact ? 278 : 316);
+  const logoHeight = isShort ? 124 : isCompact ? 146 : 170;
 
   const enterApp = () => {
     router.replace("/(tabs)/home");
@@ -70,28 +78,37 @@ export function LoginScreen() {
         <KeyboardAvoidingView
           style={styles.keyboard}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
         >
-          <ScrollView
-            bounces={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.hero}>
+          <View style={styles.screenFrame}>
+            <View style={[styles.hero, { minHeight: heroHeight, paddingTop: isShort ? spacing.lg : spacing.xl }]}>
               <View style={[styles.orb, styles.orbPrimary]} />
               <View style={[styles.orb, styles.orbSecondary]} />
               <View style={[styles.orb, styles.orbTertiary]} />
-              <Image source={sigmaLogo} style={styles.logoImage} resizeMode="contain" />
+              <Image
+                source={sigmaLogo}
+                style={[styles.logoImage, { width: logoWidth, height: logoHeight }]}
+                resizeMode="contain"
+              />
             </View>
 
-            <View style={styles.card}>
-              <Text style={styles.title}>Bem-vindo</Text>
-              <Text style={styles.subtitle}>Faça login para continuar</Text>
+            <View
+              style={[
+                styles.card,
+                isCompact && styles.cardCompact,
+                isShort && styles.cardShort,
+              ]}
+            >
+              <Text style={[styles.title, isShort && styles.titleCompact]}>Bem-vindo</Text>
+              <Text style={[styles.subtitle, isCompact && styles.subtitleCompact]}>
+                Faça login para continuar
+              </Text>
 
-              <View style={styles.formBlock}>
+              <View style={[styles.formBlock, isCompact && styles.formBlockCompact]}>
                 <View style={styles.labelBlock}>
                   <Text style={styles.label}>Usuário</Text>
                   <LoginField
+                    compact={isCompact}
                     icon="user"
                     placeholder="Digite seu usuário"
                     value={username}
@@ -102,6 +119,7 @@ export function LoginScreen() {
                 <View style={styles.labelBlock}>
                   <Text style={styles.label}>Senha</Text>
                   <LoginField
+                    compact={isCompact}
                     icon="lock"
                     placeholder="Digite sua senha"
                     value={password}
@@ -128,13 +146,13 @@ export function LoginScreen() {
                 </Pressable>
               </View>
 
-              <View style={styles.actionsBlock}>
+              <View style={[styles.actionsBlock, isCompact && styles.actionsBlockCompact]}>
                 <Pressable onPress={enterApp} style={styles.primaryButtonShadow}>
                   <LinearGradient
                     colors={["#3E7B1D", "#1E4B10"]}
                     start={{ x: 0, y: 0.5 }}
                     end={{ x: 1, y: 0.5 }}
-                    style={styles.primaryButton}
+                    style={[styles.primaryButton, isCompact && styles.actionButtonCompact]}
                   >
                     <Text style={styles.primaryButtonText}>Entrar</Text>
                   </LinearGradient>
@@ -146,14 +164,17 @@ export function LoginScreen() {
                   <View style={styles.dividerLine} />
                 </View>
 
-                <Pressable style={styles.secondaryButton} onPress={enterApp}>
+                <Pressable
+                  style={[styles.secondaryButton, isCompact && styles.actionButtonCompact]}
+                  onPress={enterApp}
+                >
                   <Text style={styles.secondaryButtonText}>Acessar sem login</Text>
                 </Pressable>
               </View>
 
-              <Text style={styles.footer}>Sigma Lithium (c) 2026</Text>
+              <Text style={[styles.footer, isCompact && styles.footerCompact]}>Sigma Lithium (c) 2026</Text>
             </View>
-          </ScrollView>
+          </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </LinearGradient>
@@ -170,18 +191,19 @@ const styles = StyleSheet.create({
   keyboard: {
     flex: 1,
   },
-  scrollContent: {
-    flexGrow: 1,
+  screenFrame: {
+    flex: 1,
     justifyContent: "flex-end",
   },
   hero: {
-    minHeight: 330,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.xxl,
+    paddingBottom: spacing.xl,
     overflow: "hidden",
+    width: "100%",
+    maxWidth: 520,
+    alignSelf: "center",
   },
   orb: {
     position: "absolute",
@@ -212,8 +234,11 @@ const styles = StyleSheet.create({
     height: 170,
   },
   card: {
-    marginHorizontal: spacing.md,
     marginTop: -10,
+    marginHorizontal: spacing.md,
+    width: "100%",
+    maxWidth: 520,
+    alignSelf: "center",
     backgroundColor: colors.white,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
@@ -225,18 +250,35 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     ...shadows.card,
   },
+  cardCompact: {
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
+    gap: spacing.md,
+  },
+  cardShort: {
+    paddingHorizontal: spacing.md,
+  },
   title: {
     color: "#31353B",
     fontSize: 22,
     fontWeight: "800",
+  },
+  titleCompact: {
+    fontSize: typography.section,
   },
   subtitle: {
     marginTop: -spacing.sm,
     color: "#7B8089",
     fontSize: typography.body,
   },
+  subtitleCompact: {
+    fontSize: typography.bodySmall,
+  },
   formBlock: {
     gap: spacing.md,
+  },
+  formBlockCompact: {
+    gap: spacing.sm,
   },
   labelBlock: {
     gap: spacing.xs,
@@ -257,11 +299,18 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: spacing.sm,
   },
+  fieldShellCompact: {
+    minHeight: 46,
+  },
   input: {
     flex: 1,
     color: "#353943",
     fontSize: typography.body,
     paddingVertical: spacing.sm,
+  },
+  inputCompact: {
+    fontSize: typography.bodySmall,
+    paddingVertical: spacing.xs,
   },
   forgotAction: {
     alignSelf: "flex-end",
@@ -275,6 +324,9 @@ const styles = StyleSheet.create({
   actionsBlock: {
     gap: spacing.md,
   },
+  actionsBlockCompact: {
+    gap: spacing.sm,
+  },
   primaryButtonShadow: {
     borderRadius: radius.pill,
     ...shadows.soft,
@@ -284,6 +336,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
+  },
+  actionButtonCompact: {
+    minHeight: 48,
   },
   primaryButtonText: {
     color: colors.white,
@@ -323,6 +378,10 @@ const styles = StyleSheet.create({
     color: "#7F848C",
     textAlign: "center",
     fontSize: typography.bodySmall,
+  },
+  footerCompact: {
+    marginTop: 0,
+    fontSize: typography.caption,
   },
 });
 
