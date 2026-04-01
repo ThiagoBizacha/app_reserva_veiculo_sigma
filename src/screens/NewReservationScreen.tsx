@@ -6,7 +6,15 @@ import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "r
 import { BackHeaderButton, PageHeader, ScreenContainer, StatusBadge } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
-import { addHours, formatDate, formatDateTime } from "@/utils/date";
+import {
+  addHours,
+  formatDate,
+  formatDateTime,
+  getNextWholeHour,
+  isPastDateTime,
+  isSameCalendarDay,
+  startOfDay,
+} from "@/utils/date";
 import { getResourceConflicts } from "@/utils/reservations";
 
 interface NewReservationScreenProps {
@@ -24,18 +32,28 @@ export function NewReservationScreen({
   initialResourceId,
 }: NewReservationScreenProps) {
   const { createReservation, reservations, resources, getResourceStatus } = useReservationStore();
-  const seededDate = initialDate ? new Date(initialDate) : new Date(2026, 2, 27, 8, 0, 0);
+  const now = new Date();
+  const nextWholeHour = getNextWholeHour(now);
+  const requestedDate = initialDate ? new Date(initialDate) : nextWholeHour;
+  const safeRequestedDate = isPastDateTime(requestedDate) ? nextWholeHour : requestedDate;
   const defaultDay = new Date(
-    seededDate.getFullYear(),
-    seededDate.getMonth(),
-    seededDate.getDate(),
+    safeRequestedDate.getFullYear(),
+    safeRequestedDate.getMonth(),
+    safeRequestedDate.getDate(),
     0,
     0,
     0,
     0
   );
-  const defaultTime = new Date(seededDate);
-  defaultTime.setMinutes(0, 0, 0);
+  const defaultTime = (() => {
+    if (isSameCalendarDay(safeRequestedDate, now)) {
+      return nextWholeHour;
+    }
+
+    const futureTime = new Date(safeRequestedDate);
+    futureTime.setHours(8, 0, 0, 0);
+    return futureTime;
+  })();
 
   const vehicleOptions = resources.filter((item) => item.category === "Veiculo");
 
@@ -68,7 +86,14 @@ export function NewReservationScreen({
   const selectedResourceStatus = selectedResource
     ? getResourceStatus(selectedResource.id, new Date(startDate))
     : "Disponivel";
-  const isSubmitDisabled = !resourceId || !purpose.trim() || !base.trim() || conflicts.length > 0;
+  const isStartDateInPast = isPastDateTime(startDate, now);
+  const todayStart = startOfDay(now);
+  const isSubmitDisabled =
+    !resourceId ||
+    !purpose.trim() ||
+    !base.trim() ||
+    conflicts.length > 0 ||
+    isStartDateInPast;
 
   const onChangeDate =
     (field: PickerField) => (event: DateTimePickerEvent, selected?: Date) => {
@@ -84,15 +109,48 @@ export function NewReservationScreen({
         const nextDate = new Date(selected);
         nextDate.setHours(0, 0, 0, 0);
         setReservationDate(nextDate);
+
+        if (isSameCalendarDay(nextDate, now)) {
+          const todayPickup = new Date(nextDate);
+          todayPickup.setHours(pickupTime.getHours(), pickupTime.getMinutes(), 0, 0);
+
+          if (isPastDateTime(todayPickup, now)) {
+            setPickupTime(getNextWholeHour(now));
+          }
+        }
+
         return;
       }
 
       const nextTime = new Date(pickupTime);
       nextTime.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+
+      const nextStart = new Date(reservationDate);
+      nextStart.setHours(nextTime.getHours(), nextTime.getMinutes(), 0, 0);
+
+      if (isPastDateTime(nextStart, now)) {
+        setFeedback({
+          type: "error",
+          message: "Escolha um horário futuro para continuar.",
+        });
+        return;
+      }
+
+      setFeedback((current) =>
+        current?.message === "Escolha um horário futuro para continuar." ? null : current
+      );
       setPickupTime(nextTime);
     };
 
   const handleSave = () => {
+    if (isStartDateInPast) {
+      setFeedback({
+        type: "error",
+        message: "Não é possível salvar reservas com data ou horário no passado.",
+      });
+      return;
+    }
+
     const result = createReservation({
       resourceId,
       startDate,
@@ -220,7 +278,14 @@ export function NewReservationScreen({
       </Section>
 
       <Section title="Bloqueios por Horário">
-        {conflicts.length === 0 ? (
+        {isStartDateInPast ? (
+          <View style={styles.conflictCard}>
+            <Text style={styles.conflictTitle}>Horário inválido</Text>
+            <Text style={styles.conflictLine}>
+              Escolha uma data e horário futuros para criar a reserva.
+            </Text>
+          </View>
+        ) : conflicts.length === 0 ? (
           <View style={styles.freeState}>
             <Feather name="check-circle" size={18} color={colors.success} />
             <Text style={styles.freeStateText}>
@@ -292,7 +357,8 @@ export function NewReservationScreen({
                       <View style={styles.modalItemCopy}>
                         <Text style={styles.modalItemTitle}>{resource.name}</Text>
                         <Text style={styles.modalItemMeta}>
-                          {resource.plate ?? resource.code} | {resource.brand ?? "-"} {resource.model ?? ""}
+                          {resource.plate ?? resource.code} | {resource.brand ?? "-"}{" "}
+                          {resource.model ?? ""}
                         </Text>
                         <Text style={styles.modalItemMeta}>
                           {resource.rentalCompany ?? "-"} | Km {resource.currentMileage ?? "-"}
@@ -316,6 +382,7 @@ export function NewReservationScreen({
           value={pickerField === "date" ? reservationDate : pickupTime}
           mode={pickerField}
           display={Platform.OS === "ios" ? "spinner" : "default"}
+          minimumDate={pickerField === "date" ? todayStart : undefined}
           onChange={onChangeDate(pickerField)}
         />
       ) : null}

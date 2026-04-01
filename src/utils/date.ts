@@ -16,6 +16,12 @@ const weekdayFormatter = new Intl.DateTimeFormat("pt-BR", {
 export const toDate = (value: string | Date) =>
   value instanceof Date ? new Date(value) : new Date(value);
 
+export const startOfDay = (value: string | Date) => {
+  const date = toDate(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
 export const formatDate = (value: string | Date) => dateFormatter.format(toDate(value));
 
 export const formatDateTime = (value: string | Date) =>
@@ -65,14 +71,17 @@ export const isSameDay = (left: string | Date, right: string | Date) => {
 };
 
 export const isWithinRange = (target: Date, start: string | Date, end: string | Date) => {
-  const value = new Date(target);
-  value.setHours(0, 0, 0, 0);
-  const startDate = toDate(start);
-  startDate.setHours(0, 0, 0, 0);
-  const endDate = toDate(end);
-  endDate.setHours(0, 0, 0, 0);
+  const value = startOfDay(target);
+  const startDate = startOfDay(start);
+  const endDate = startOfDay(end);
   return value >= startDate && value <= endDate;
 };
+
+export const isPastDay = (value: string | Date, referenceDate = new Date()) =>
+  startOfDay(value).getTime() < startOfDay(referenceDate).getTime();
+
+export const isPastDateTime = (value: string | Date, referenceDate = new Date()) =>
+  toDate(value).getTime() < referenceDate.getTime();
 
 export const getWeekdayLabel = (date: Date) => {
   const label = weekdayFormatter.format(date).replace(".", "");
@@ -125,4 +134,18 @@ export const getDurationHours = (start: string | Date, end: string | Date) => {
   }
 
   return (endDate - startDate) / (1000 * 60 * 60);
+};
+
+export const getNextWholeHour = (referenceDate = new Date()) => {
+  const next = new Date(referenceDate);
+  const shouldAdvanceHour =
+    next.getMinutes() > 0 || next.getSeconds() > 0 || next.getMilliseconds() > 0;
+  next.setSeconds(0, 0);
+
+  if (shouldAdvanceHour) {
+    next.setHours(next.getHours() + 1, 0, 0, 0);
+    return next;
+  }
+
+  return next;
 };

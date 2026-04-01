@@ -522,6 +522,13 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       return { success: false, message: "A data final não pode ser menor que a data inicial." };
     }
 
+    if (new Date(payload.startDate) < new Date()) {
+      return {
+        success: false,
+        message: "Não é possível criar reservas com data ou horário no passado.",
+      };
+    }
+
     if (!isSameCalendarDay(payload.startDate, payload.endDate)) {
       return {
         success: false,
