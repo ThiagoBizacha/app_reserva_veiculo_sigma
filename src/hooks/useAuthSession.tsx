@@ -19,10 +19,12 @@ interface AuthSessionValue {
   session: Session | null;
   authUser: SupabaseAuthUser | null;
   isAuthenticated: boolean;
+  mustChangePassword: boolean;
   isReady: boolean;
   isSubmitting: boolean;
   authError: string | null;
   signInWithPassword: (email: string, password: string) => Promise<AuthCommandResult>;
+  updatePassword: (nextPassword: string, confirmation: string) => Promise<AuthCommandResult>;
   signOut: () => Promise<AuthCommandResult>;
   clearAuthError: () => void;
 }
@@ -146,19 +148,97 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
     }
   }, []);
 
+  const updatePassword = useCallback(
+    async (nextPassword: string, confirmation: string): Promise<AuthCommandResult> => {
+      if (!hasBackendConfig()) {
+        const message =
+          "Backend nao configurado. Defina EXPO_PUBLIC_SUPABASE_URL e EXPO_PUBLIC_SUPABASE_ANON_KEY antes de alterar a senha.";
+        setAuthError(message);
+        return { success: false, message };
+      }
+
+      const normalizedPassword = nextPassword.trim();
+      const normalizedConfirmation = confirmation.trim();
+
+      if (!normalizedPassword || !normalizedConfirmation) {
+        const message = "Informe e confirme a nova senha.";
+        setAuthError(message);
+        return { success: false, message };
+      }
+
+      if (!/^\d+$/.test(normalizedPassword)) {
+        const message = "A nova senha deve conter apenas digitos numericos.";
+        setAuthError(message);
+        return { success: false, message };
+      }
+
+      if (normalizedPassword.length < 4) {
+        const message = "A nova senha precisa ter pelo menos 4 digitos.";
+        setAuthError(message);
+        return { success: false, message };
+      }
+
+      if (normalizedPassword !== normalizedConfirmation) {
+        const message = "A confirmacao da senha nao confere.";
+        setAuthError(message);
+        return { success: false, message };
+      }
+
+      setIsSubmitting(true);
+      setAuthError(null);
+
+      try {
+        const supabase = getSupabaseClient();
+        const currentMetadata =
+          session?.user.user_metadata && typeof session.user.user_metadata === "object"
+            ? session.user.user_metadata
+            : {};
+        const { data, error } = await supabase.auth.updateUser({
+          password: normalizedPassword,
+          data: {
+            ...currentMetadata,
+            must_change_password: false,
+            password_last_changed_at: new Date().toISOString(),
+          },
+        });
+
+        if (error) {
+          setAuthError(error.message);
+          return { success: false, message: error.message };
+        }
+
+        if (data.user && session) {
+          setSession({
+            ...session,
+            user: data.user,
+          });
+        }
+
+        return { success: true };
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [session]
+  );
+
+  const mustChangePassword = session?.user?.user_metadata?.must_change_password === true;
+
   const value = useMemo<AuthSessionValue>(
     () => ({
       session,
       authUser: session?.user ?? null,
       isAuthenticated: Boolean(session?.user),
+      mustChangePassword,
       isReady,
       isSubmitting,
       authError,
       signInWithPassword,
+      updatePassword,
       signOut,
       clearAuthError: () => setAuthError(null),
     }),
-    [authError, isReady, isSubmitting, session, signInWithPassword, signOut]
+    [authError, isReady, isSubmitting, mustChangePassword, session, signInWithPassword, signOut, updatePassword]
   );
 
   return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>;

@@ -2,7 +2,6 @@
 
 Aplicativo interno em React Native + Expo para reserva corporativa de veiculos.
 
-**App em produção:** https://dist-six-lyart-17.vercel.app
 
 As etapas `B03` e `B01` agora estao estruturadas no codigo:
 
@@ -132,7 +131,7 @@ No primeiro login com essa senha, o app redireciona para a tela de definicao da 
 O app está publicado em:
 
 ```
-https://dist-six-lyart-17.vercel.app
+https://distnew-psi.vercel.app
 ```
 
 Qualquer pessoa abre o link no celular, faz login com email e senha, e usa o app.

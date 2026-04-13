@@ -26,6 +26,15 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="apple-mobile-web-app-title" content="Sigma" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
 
+        {/* Carrega a fonte dos ícones Feather via CSS para garantir renderização no web */}
+        <style>{`
+          @font-face {
+            font-family: 'Feather';
+            src: url('/fonts/Feather.ttf') format('truetype');
+            font-display: block;
+          }
+        `}</style>
+
         {/* Reset de estilos do Expo para evitar scroll indesejado no navegador */}
         <ScrollViewStyleReset />
       </head>

@@ -121,11 +121,49 @@ async function createAuthUser(user, password) {
     user_metadata: {
       app_user_id: user.id,
       full_name: user.full_name,
+      must_change_password: true,
+      temporary_password_assigned_at: new Date().toISOString(),
     },
   });
 
   if (error || !data.user) {
     throw error ?? new Error(`Falha ao criar usuario auth para ${loginEmail}.`);
+  }
+
+  return data.user;
+}
+
+async function syncExistingAuthUser(publicUser, authUser) {
+  const currentMetadata =
+    authUser.user_metadata && typeof authUser.user_metadata === "object"
+      ? authUser.user_metadata
+      : {};
+
+  const nextMetadata = {
+    ...currentMetadata,
+    app_user_id: publicUser.id,
+    full_name: publicUser.full_name,
+    must_change_password:
+      currentMetadata.must_change_password === false
+        ? false
+        : true,
+  };
+
+  const requiresUpdate =
+    currentMetadata.app_user_id !== nextMetadata.app_user_id ||
+    currentMetadata.full_name !== nextMetadata.full_name ||
+    currentMetadata.must_change_password !== nextMetadata.must_change_password;
+
+  if (!requiresUpdate) {
+    return authUser;
+  }
+
+  const { data, error } = await supabase.auth.admin.updateUserById(authUser.id, {
+    user_metadata: nextMetadata,
+  });
+
+  if (error || !data.user) {
+    throw error ?? new Error(`Falha ao atualizar metadata do usuario ${authUser.id}.`);
   }
 
   return data.user;
@@ -163,8 +201,10 @@ async function run() {
       continue;
     }
 
-    const authUser =
-      existingByEmail.get(loginEmail) ?? (await createAuthUser(publicUser, temporaryPassword));
+    const existingAuthUser = existingByEmail.get(loginEmail);
+    const authUser = existingAuthUser
+      ? await syncExistingAuthUser(publicUser, existingAuthUser)
+      : await createAuthUser(publicUser, temporaryPassword);
 
     existingByEmail.set(loginEmail, authUser);
 

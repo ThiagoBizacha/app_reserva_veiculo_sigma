@@ -1,3 +1,5 @@
+import { Feather } from "@expo/vector-icons";
+import { useFonts } from "expo-font";
 import { Stack, usePathname, useRootNavigationState, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -7,7 +9,7 @@ import { ReservationStoreProvider } from "@/hooks/useReservationStore";
 import { colors, radius, spacing, typography } from "@/theme";
 
 function AuthNavigationGate() {
-  const { isAuthenticated, isReady } = useAuthSession();
+  const { isAuthenticated, isReady, mustChangePassword } = useAuthSession();
   const pathname = usePathname();
   const router = useRouter();
   const rootNavigationState = useRootNavigationState();
@@ -18,16 +20,22 @@ function AuthNavigationGate() {
     }
 
     const isOnLoginRoute = pathname === "/";
+    const isOnPasswordSetupRoute = pathname === "/password-setup";
 
     if (!isAuthenticated && !isOnLoginRoute) {
       router.replace("/");
       return;
     }
 
-    if (isAuthenticated && isOnLoginRoute) {
+    if (isAuthenticated && mustChangePassword && !isOnPasswordSetupRoute) {
+      router.replace("/password-setup");
+      return;
+    }
+
+    if (isAuthenticated && !mustChangePassword && (isOnLoginRoute || isOnPasswordSetupRoute)) {
       router.replace("/(tabs)/home");
     }
-  }, [isAuthenticated, isReady, pathname, rootNavigationState?.key, router]);
+  }, [isAuthenticated, isReady, mustChangePassword, pathname, rootNavigationState?.key, router]);
 
   return null;
 }
@@ -70,6 +78,12 @@ function RootNavigation() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({ ...Feather.font });
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
     <AuthSessionProvider>
       <ReservationStoreProvider>

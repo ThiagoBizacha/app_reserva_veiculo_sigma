@@ -4,7 +4,6 @@ import { StatusBar } from "expo-status-bar";
 import { type ReactNode, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -161,18 +160,9 @@ export function LoginScreen() {
                     EXPO_PUBLIC_SUPABASE_ANON_KEY antes de autenticar.
                   </Text>
                 ) : null}
-
-                <Pressable
-                  style={styles.forgotAction}
-                  onPress={() =>
-                    Alert.alert(
-                      "Redefinicao de senha",
-                      "Enquanto o fluxo automatizado nao entra, a troca de senha deve ser feita pela administracao do Supabase/Auth."
-                    )
-                  }
-                >
-                  <Text style={styles.forgotText}>Esqueceu a senha?</Text>
-                </Pressable>
+                <Text style={styles.tempPasswordHint}>
+                  Primeiro acesso: entre com a senha temporaria e o app vai exigir a definicao da senha definitiva antes de liberar o uso.
+                </Text>
               </View>
 
               <View style={[styles.actionsBlock, isCompact && styles.actionsBlockCompact]}>
@@ -354,14 +344,10 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
     lineHeight: 18,
   },
-  forgotAction: {
-    alignSelf: "flex-end",
-    paddingVertical: 2,
-  },
-  forgotText: {
-    color: "#355F23",
-    fontSize: typography.bodySmall,
-    fontWeight: "700",
+  tempPasswordHint: {
+    color: colors.textSecondary,
+    fontSize: typography.caption,
+    lineHeight: 18,
   },
   actionsBlock: {
     gap: spacing.md,

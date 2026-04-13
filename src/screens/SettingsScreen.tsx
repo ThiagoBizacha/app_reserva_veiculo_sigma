@@ -2,6 +2,7 @@
 import { File as ExpoFile } from "expo-file-system";
 import { type ReactNode, useState } from "react";
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { router } from "expo-router";
 import {
   Card,
   FormField,
@@ -11,6 +12,7 @@ import {
   ScreenContainer,
   SecondaryButton,
 } from "@/components";
+import { useAuthSession } from "@/hooks/useAuthSession";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import { getUserDisplayName } from "@/utils/users";
@@ -440,6 +442,7 @@ export function SettingsScreen() {
     exportReservationsReport,
     isMutating,
   } = useReservationStore();
+  const { mustChangePassword } = useAuthSession();
 
   const [vehicleForm, setVehicleForm] = useState<NewVehiclePayload>(emptyVehicleForm);
   const [userForm, setUserForm] = useState<NewUserPayload>(() =>
@@ -631,6 +634,15 @@ export function SettingsScreen() {
           <MetricCard label="Usuários" value={users.length} helper="Cadastro ativo no app" />
           <MetricCard label="Reservas" value={reservations.length} helper="Linhas no CSV" />
         </View>
+
+        <SettingsActionCard
+          icon="shield"
+          title="Segurança da conta"
+          subtitle="Altere sua senha diretamente no app. No primeiro acesso com senha temporária, a troca fica obrigatória."
+          helper={mustChangePassword ? "Troca obrigatória pendente" : "Senha ativa"}
+          buttonLabel={mustChangePassword ? "Definir senha definitiva" : "Alterar minha senha"}
+          onPress={() => router.push("/password-setup")}
+        />
 
         <SettingsActionCard
           icon="truck"
