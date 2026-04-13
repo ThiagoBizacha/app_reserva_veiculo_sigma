@@ -266,6 +266,7 @@ export interface Database {
       };
       users: {
         Row: {
+          auth_user_id: string | null;
           area: string;
           area_departamento: string;
           centro_custo: string;
@@ -294,6 +295,7 @@ export interface Database {
           user_id: string;
         };
         Insert: {
+          auth_user_id?: string | null;
           area: string;
           area_departamento: string;
           centro_custo: string;

@@ -2,9 +2,10 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DriverLicensePreviewModal, ScreenContainer } from "@/components";
+import { useAuthSession } from "@/hooks/useAuthSession";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import type { User } from "@/types";
@@ -17,6 +18,7 @@ export function HomeScreen() {
     getActionableReservations,
     getSummary,
   } = useReservationStore();
+  const { isSubmitting, signOut } = useAuthSession();
   const insets = useSafeAreaInsets();
   const [licenseUser, setLicenseUser] = useState<User | null>(null);
   const summary = getSummary();
@@ -31,6 +33,14 @@ export function HomeScreen() {
     .toLowerCase();
   const isLicenseValid = normalizedCnhStatus === "valida";
   const cnhStatusLabel = isLicenseValid ? "CNH válida" : "CNH vencida";
+
+  const handleSignOut = async () => {
+    const result = await signOut();
+
+    if (!result.success && result.message) {
+      Alert.alert("Falha ao encerrar sessao", result.message);
+    }
+  };
 
   const shortcuts = [
     {
@@ -72,7 +82,8 @@ export function HomeScreen() {
             <View style={styles.divider} />
             <Pressable
               accessibilityRole="button"
-              onPress={() => router.replace("/")}
+              disabled={isSubmitting}
+              onPress={() => void handleSignOut()}
               style={styles.exitButton}
             >
               <Feather name="log-out" size={12} color={colors.white} />

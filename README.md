@@ -1,18 +1,24 @@
 # Sigma Reserva
 
-Aplicativo interno em React Native + Expo para reserva corporativa de veiculos. A etapa `B03` foi iniciada com backend persistente e multiusuario usando Supabase como fonte unica de verdade.
+Aplicativo interno em React Native + Expo para reserva corporativa de veiculos.
+
+As etapas `B03` e `B01` agora estao estruturadas no codigo:
+
+- `B03`: backend persistente e multiusuario com Supabase como fonte unica de verdade
+- `B01`: autenticacao real com Supabase Auth, sessao persistida e rotas protegidas
 
 ## Estado atual
 
 O app agora foi estruturado para:
 
 - carregar `users`, `resources`, `reservations` e `reservation_history` a partir do backend;
-- manter `AsyncStorage` apenas como cache auxiliar de leitura;
-- sincronizar o store central com backend remoto e realtime;
-- persistir criacao de reserva, cancelamento, check-in, check-out, cadastro de usuario e cadastro de veiculo;
+- manter `AsyncStorage` apenas como cache auxiliar e persistencia de sessao no mobile;
+- exigir sessao autenticada para entrar no app;
+- restaurar a sessao ao reabrir o app;
+- persistir criacao de reserva, cancelamento, check-in e check-out no backend;
 - refletir a mesma fonte de verdade em Agenda, Minhas Reservas, Frota, Painel e Detalhes.
 
-`src/data/*` continua no repositorio apenas como insumo de seed inicial do backend. Nao e mais fluxo operacional do app.
+`src/data/*` continua no repositorio apenas como insumo de seed e bootstrap de usuarios de teste. Nao e mais fluxo operacional do app.
 
 ## Stack
 
@@ -21,7 +27,7 @@ O app agora foi estruturado para:
 - TypeScript
 - Expo Router
 - Supabase (`@supabase/supabase-js`)
-- AsyncStorage apenas como cache auxiliar
+- AsyncStorage
 
 ## Estrutura relevante
 
@@ -29,22 +35,16 @@ O app agora foi estruturado para:
 app/
 src/
   backend/
-    appState.ts
-    cache.ts
-    client.ts
-    config.ts
-    database.types.ts
-    mappers.ts
-    repositories/
   hooks/
+    useAuthSession.tsx
     useReservationStore.tsx
   screens/
   services/
-    reservationService.ts
 supabase/
   migrations/
 scripts/
   seed-supabase-from-mocks.mjs
+  provision-supabase-auth-users.mjs
 .env.example
 README.md
 ```
@@ -56,24 +56,21 @@ README.md
 Crie um projeto no Supabase e copie:
 
 - `Project URL`
-- `anon/public key`
-- `service role key` apenas para seed local
+- `publishable key` para o app
+- `secret/service role key` apenas para seed e scripts administrativos
 
-### 2. Aplicar a migration
+### 2. Aplicar as migrations
 
-Use a migration em [supabase/migrations/202604130001_b03_backend_persistente.sql](/c:/Users/ThiagoBizacha/projects/app_reserva_veiculo_sigma/supabase/migrations/202604130001_b03_backend_persistente.sql:1).
+Execute as duas migrations no Supabase:
 
-Voce pode aplicar de duas formas:
+1. [supabase/migrations/202604130001_b03_backend_persistente.sql](/c:/Users/ThiagoBizacha/projects/app_reserva_veiculo_sigma/supabase/migrations/202604130001_b03_backend_persistente.sql:1)
+2. [supabase/migrations/202604130002_b01_auth_real.sql](/c:/Users/ThiagoBizacha/projects/app_reserva_veiculo_sigma/supabase/migrations/202604130002_b01_auth_real.sql:1)
 
-1. SQL Editor do Supabase
-   Cole o arquivo inteiro e execute.
-2. Supabase CLI
-   Se a CLI estiver configurada, rode a migration no ambiente desejado.
+A primeira cria o modelo persistente. A segunda:
 
-Observacao:
-
-- A migration ja cria as tabelas operacionais, historico, auditoria, indisponibilidade e a restricao de nao sobreposicao de reservas ativas por veiculo.
-- O schema habilita RLS com politicas temporariamente abertas para `anon` e `authenticated`. Isso e intencional para fechar `B03` e destravar `B01`/`B02` depois.
+- adiciona `auth_user_id` em `public.users`;
+- fecha o acesso anonimo;
+- deixa as tabelas operacionais acessiveis apenas por usuarios autenticados.
 
 ### 3. Configurar variaveis de ambiente
 
@@ -81,19 +78,24 @@ Copie `.env.example` para `.env.local` ou `.env` e preencha:
 
 ```bash
 EXPO_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-EXPO_PUBLIC_DEFAULT_USER_ID=usr-01
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-publishable-key
 
-# Somente para seed local
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+# Apenas para seed e scripts administrativos locais
+SUPABASE_SERVICE_ROLE_KEY=your-secret-key
+SUPABASE_AUTH_TEMP_PASSWORD=ChangeMe123!
 ```
+
+Observacoes:
+
+- `SUPABASE_SERVICE_ROLE_KEY` nunca pode ir para o repositorio.
+- `SUPABASE_AUTH_TEMP_PASSWORD` e usada apenas no script que cria usuarios de teste no Supabase Auth.
 
 ### 4. Popular o backend inicial
 
-Depois de aplicar a migration, rode:
+Depois de aplicar a migration do `B03`, rode:
 
 ```bash
-node scripts/seed-supabase-from-mocks.mjs
+npm run seed:supabase
 ```
 
 Esse script:
@@ -103,6 +105,23 @@ Esse script:
 - le `src/data/reservations.ts`;
 - faz `upsert` no Supabase para bootstrap inicial.
 
+### 5. Provisionar usuarios autenticados
+
+Depois de aplicar a migration do `B01`, rode:
+
+```bash
+npm run auth:provision:supabase
+```
+
+Esse script:
+
+- le os usuarios ja persistidos em `public.users`;
+- cria usuarios equivalentes no `Supabase Auth`;
+- marca o email como confirmado;
+- grava `auth_user_id` em `public.users`.
+
+Todos os usuarios provisionados recebem a mesma senha temporaria definida em `SUPABASE_AUTH_TEMP_PASSWORD`.
+
 ## Como rodar o app
 
 1. Instale as dependencias:
@@ -111,9 +130,9 @@ Esse script:
 npm install
 ```
 
-2. Configure o backend via `.env.local`.
+2. Configure `.env.local`.
 
-3. Inicie o app:
+3. Rode o app:
 
 ```bash
 npm run android
@@ -125,40 +144,63 @@ Ou:
 npm run start
 ```
 
-Se o backend nao estiver configurado, o app mostra um estado bloqueante de setup em vez de voltar para mocks locais.
+Para testar no celular com Expo Go:
 
-## Decisoes tecnicas
+```bash
+npx expo start --tunnel --clear
+```
 
-- O store central em `src/hooks/useReservationStore.tsx` continua sendo a API de consumo das telas, mas deixou de ser a camada de persistencia.
-- A leitura remota foi separada em `src/backend/*` com cliente, mapeadores, cache e repositorios.
-- As regras de negocio de mutacao foram extraidas para `src/services/reservationService.ts`.
-- O cache local agora e derivado do backend e usado apenas para acelerar bootstrap ou sobreviver a falhas temporarias de sincronizacao.
-- A consistencia entre telas depende do mesmo snapshot em memoria e de refresh remoto apos mutacoes, alem de subscription de realtime do Supabase.
-- O banco passou a impor a regra critica de nao sobreposicao de reservas ativas para o mesmo veiculo.
+## Como entrar no app
+
+Depois do provisionamento do Auth, use qualquer email corporativo seeded e a senha temporaria definida em `SUPABASE_AUTH_TEMP_PASSWORD`.
+
+Exemplos do dataset atual:
+
+- `thiago.bizacha@sigma.local`
+- `marina.souto@sigma.local`
+- `caio.mota@sigma.local`
+- `roberto.alves@sigma.local`
+- `maria.silva@sigma.local`
 
 ## Validacao tecnica
 
-Checklist executado nesta etapa:
+Checklist automatizado desta etapa:
 
 - `npm run typecheck`
 
-Validacao adicional recomendada apos preencher o backend real:
+Checklist manual recomendado para homologacao de `B01` + `B03`:
 
-1. Criar o schema no Supabase.
-2. Rodar a seed inicial.
-3. Abrir o app.
-4. Criar uma reserva.
-5. Reiniciar o app.
-6. Confirmar a mesma reserva em Minhas Reservas, Agenda, Frota e Detalhe.
-7. Fazer check-in.
-8. Confirmar status `Em uso` nas mesmas telas.
-9. Fazer check-out.
-10. Confirmar status `Concluida` e veiculo disponivel.
+1. Aplicar as duas migrations.
+2. Rodar `npm run seed:supabase`.
+3. Rodar `npm run auth:provision:supabase`.
+4. Abrir o app sem sessao e confirmar que a tela inicial e o login.
+5. Fazer login com email e senha temporaria.
+6. Fechar o app e abrir novamente para confirmar restauracao da sessao.
+7. Criar uma reserva.
+8. Confirmar a mesma reserva em Minhas Reservas, Agenda, Frota e Detalhe.
+9. Fazer check-in.
+10. Confirmar status `Em uso`.
+11. Fazer check-out.
+12. Confirmar status `Concluida`.
+13. Fazer logout e confirmar retorno para a tela de login.
+
+## Decisoes tecnicas
+
+- `src/hooks/useAuthSession.tsx` concentra sessao, `signInWithPassword`, `signOut`, restauracao e observacao de mudancas de auth.
+- `src/hooks/useReservationStore.tsx` continua sendo a API de consumo das telas, mas agora depende da sessao autenticada para sincronizar o backend.
+- O usuario corrente deixou de vir de `EXPO_PUBLIC_DEFAULT_USER_ID`. O app resolve o colaborador pelo `auth_user_id`, com fallback por email para vinculo inicial.
+- O app mobile persiste a sessao via AsyncStorage. Na web, a sessao usa o storage do navegador.
+- O banco agora exige usuario autenticado para acessar as tabelas operacionais. Ownership por perfil e recurso fica para `B02`.
+
+## Limites atuais
+
+- `B02` ainda nao foi implementado. As politicas RLS estao fechadas para anonimo, mas ainda nao restringem por papel ou ownership.
+- O app nao cria usuarios no Supabase Auth pelo frontend. O provisionamento inicial e administrativo ainda acontece por script local com chave secreta.
+- O fluxo automatizado de recuperacao de senha ainda nao entrou.
 
 ## Proximos passos
 
-- `B01` autenticacao real e gestao de sessao
 - `B02` autorizacao por perfil e ownership
-- endurecer politicas RLS por usuario, papel e ownership
-- substituir a sessao simulada por identidade real do Supabase/Auth corporativo
-
+- endurecer politicas RLS por usuario, papel e reserva
+- evoluir onboarding administrativo de usuarios
+- adicionar fluxo real de redefinicao de senha

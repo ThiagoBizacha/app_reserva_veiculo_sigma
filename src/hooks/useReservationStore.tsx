@@ -33,6 +33,7 @@ import { colors, radius, spacing, typography } from "@/theme";
 import { getBackendConfig } from "@/backend/config";
 import { fetchRemoteAppState, subscribeToRemoteAppState } from "@/backend/appState";
 import { readCachedAppState, writeCachedAppState } from "@/backend/cache";
+import { linkUserToAuth } from "@/backend/repositories/usersRepository";
 import {
   type ActionResult,
   cancelReservationUseCase,
@@ -46,6 +47,7 @@ import {
   updateUserUseCase,
   updateVehicleUseCase,
 } from "@/services/reservationService";
+import { useAuthSession } from "./useAuthSession";
 
 interface ReservationStoreValue {
   users: User[];
@@ -120,10 +122,31 @@ const EMPTY_USER: User = {
   termosPaytrack: false,
 };
 
+function normalizeEmail(value?: string) {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+function userMatchesAuthIdentity(user: User, authUserId?: string, authEmail?: string) {
+  if (authUserId) {
+    if (user.authUserId) {
+      return user.authUserId === authUserId;
+    }
+  }
+
+  if (!authEmail || user.authUserId) {
+    return false;
+  }
+
+  return [user.email, user.emailCorporativo].some(
+    (candidate) => normalizeEmail(candidate) === authEmail
+  );
+}
+
 const ReservationStoreContext = createContext<ReservationStoreValue | null>(null);
 
 export function ReservationStoreProvider({ children }: PropsWithChildren) {
   const backendConfig = getBackendConfig();
+  const { authUser, isAuthenticated, isReady: isAuthReady, signOut } = useAuthSession();
   const [users, setUsers] = useState<User[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -134,11 +157,13 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | undefined>(undefined);
   const realtimeRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  const authLinkRef = useRef<string | null>(null);
+  const authEmail = normalizeEmail(authUser?.email);
   const currentUser =
-    users.find((user) => user.id === backendConfig.defaultUserId) ?? users[0] ?? EMPTY_USER;
+    users.find((user) => userMatchesAuthIdentity(user, authUser?.id, authEmail)) ?? EMPTY_USER;
   const currentUserId = currentUser.id;
-  const currentUserName = currentUser.name || "Usuario";
+  const currentUserName = currentUser.name || authUser?.email || "Usuario";
+  const hasLinkedCurrentUser = currentUser.id !== EMPTY_USER.id;
   const hasMinimumData = users.length > 0;
 
   const applySnapshot = useCallback(
@@ -231,6 +256,13 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
         return;
       }
 
+      if (!authUser) {
+        setSyncError(null);
+        setIsRefreshing(false);
+        setIsBootstrapping(false);
+        return;
+      }
+
       if (!options?.silent) {
         setIsRefreshing(true);
       }
@@ -250,11 +282,42 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
         setIsBootstrapping(false);
       }
     },
-    [applySnapshot, backendConfig.isConfigured]
+    [applySnapshot, authUser, backendConfig.isConfigured]
   );
 
   useEffect(() => {
     let active = true;
+
+    if (!isAuthReady) {
+      return () => {
+        active = false;
+      };
+    }
+
+    if (!backendConfig.isConfigured) {
+      setIsBootstrapping(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    if (!isAuthenticated || !authUser) {
+      startTransition(() => {
+        setUsers([]);
+        setResources([]);
+        setReservations([]);
+        setIsUsingCachedData(false);
+        setSyncError(null);
+        setLastSyncedAt(undefined);
+        setIsRefreshing(false);
+        setIsMutating(false);
+        setIsBootstrapping(false);
+      });
+
+      return () => {
+        active = false;
+      };
+    }
 
     const bootstrap = async () => {
       const cachedState = await readCachedAppState();
@@ -287,10 +350,10 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
     return () => {
       active = false;
     };
-  }, [applySnapshot, refreshRemoteState]);
+  }, [applySnapshot, authUser, backendConfig.isConfigured, isAuthReady, isAuthenticated, refreshRemoteState]);
 
   useEffect(() => {
-    if (!backendConfig.isConfigured) {
+    if (!backendConfig.isConfigured || !isAuthenticated || !authUser) {
       return;
     }
 
@@ -310,10 +373,10 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       }
       unsubscribe();
     };
-  }, [backendConfig.isConfigured, refreshRemoteState]);
+  }, [authUser, backendConfig.isConfigured, isAuthenticated, refreshRemoteState]);
 
   useEffect(() => {
-    if (!backendConfig.isConfigured) {
+    if (!backendConfig.isConfigured || !isAuthenticated || !authUser) {
       return;
     }
 
@@ -326,7 +389,56 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
     return () => {
       subscription.remove();
     };
-  }, [backendConfig.isConfigured, refreshRemoteState]);
+  }, [authUser, backendConfig.isConfigured, isAuthenticated, refreshRemoteState]);
+
+  useEffect(() => {
+    authLinkRef.current = null;
+  }, [authUser?.id]);
+
+  useEffect(() => {
+    if (!authUser || !hasLinkedCurrentUser || currentUser.authUserId === authUser.id) {
+      return;
+    }
+
+    if (currentUser.authUserId && currentUser.authUserId !== authUser.id) {
+      return;
+    }
+
+    const linkKey = `${currentUser.id}:${authUser.id}`;
+
+    if (authLinkRef.current === linkKey) {
+      return;
+    }
+
+    authLinkRef.current = linkKey;
+
+    const syncAuthIdentity = async () => {
+      try {
+        const linkedUser = await linkUserToAuth(currentUser.id, authUser.id);
+        const nextUsers = users
+          .map((item) => (item.id === linkedUser.id ? linkedUser : item))
+          .sort((left, right) => left.fullName.localeCompare(right.fullName, "pt-BR"));
+
+        setUsers(nextUsers);
+        await writeCachedAppState({
+          cachedAt: new Date().toISOString(),
+          users: nextUsers,
+          resources,
+          reservations,
+        });
+        void refreshRemoteState({ silent: true });
+      } catch (error) {
+        authLinkRef.current = null;
+        setSyncError(
+          error instanceof Error
+            ? error.message
+            : "Nao foi possivel vincular a sessao autenticada ao cadastro interno."
+        );
+      }
+    };
+
+    void syncAuthIdentity();
+  }, [authUser, currentUser, hasLinkedCurrentUser, refreshRemoteState, reservations, resources, users]);
 
   const buildSnapshot = useCallback(
     () => ({
@@ -346,6 +458,14 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
         snapshot: ReturnType<typeof buildSnapshot>
       ) => Promise<ActionResult>
     ): Promise<ActionResult> => {
+      if (!isAuthenticated || !authUser || !hasLinkedCurrentUser) {
+        return {
+          success: false,
+          message:
+            "Sessao nao iniciada ou usuario autenticado ainda nao vinculado ao cadastro interno.",
+        };
+      }
+
       if (!backendConfig.isConfigured) {
         return {
           success: false,
@@ -377,7 +497,15 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
         setIsMutating(false);
       }
     },
-    [backendConfig.isConfigured, buildSnapshot, mergeActionResultIntoState, refreshRemoteState]
+    [
+      authUser,
+      backendConfig.isConfigured,
+      buildSnapshot,
+      hasLinkedCurrentUser,
+      isAuthenticated,
+      mergeActionResultIntoState,
+      refreshRemoteState,
+    ]
   );
 
   const getResourceStatus = useCallback(
@@ -550,6 +678,14 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
     ]
   );
 
+  if (!isAuthenticated || !authUser) {
+    return (
+      <ReservationStoreContext.Provider value={value}>
+        {children}
+      </ReservationStoreContext.Provider>
+    );
+  }
+
   if (isBootstrapping && !hasMinimumData) {
     return (
       <BlockingStateScreen
@@ -586,6 +722,19 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
         description="O backend foi configurado, mas ainda nao existe nenhum usuario persistido. Execute a seed inicial antes de usar o app."
         actionLabel="Atualizar"
         onPress={() => void refreshRemoteState()}
+      />
+    );
+  }
+
+  if (!isBootstrapping && users.length > 0 && !hasLinkedCurrentUser) {
+    return (
+      <BlockingStateScreen
+        title="Usuario autenticado sem vinculo interno"
+        description="A sessao do Supabase foi iniciada, mas o email autenticado nao corresponde a nenhum colaborador persistido no cadastro interno."
+        actionLabel="Encerrar sessao"
+        onPress={() => {
+          void signOut();
+        }}
       />
     );
   }

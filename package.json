@@ -9,7 +9,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "seed:supabase": "node scripts/seed-supabase-from-mocks.mjs"
+    "seed:supabase": "node scripts/seed-supabase-from-mocks.mjs",
+    "auth:provision:supabase": "node scripts/provision-supabase-auth-users.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

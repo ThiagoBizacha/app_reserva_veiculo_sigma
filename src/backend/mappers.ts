@@ -65,6 +65,7 @@ export function mapUserRow(row: UserRow): User {
   return {
     id: row.id,
     userId: row.user_id,
+    authUserId: row.auth_user_id ?? undefined,
     name: row.name,
     fullName: row.full_name,
     cpf: row.cpf,
@@ -184,6 +185,7 @@ export function mapUserToInsert(user: User): UserInsert {
   return {
     id: user.id,
     user_id: user.userId,
+    auth_user_id: user.authUserId ?? null,
     name: user.name,
     full_name: user.fullName,
     cpf: user.cpf,

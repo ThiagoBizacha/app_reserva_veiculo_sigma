@@ -1,9 +1,10 @@
-﻿import { Feather } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { type ReactNode, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -15,6 +16,8 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { getBackendConfig } from "@/backend/config";
+import { useAuthSession } from "@/hooks/useAuthSession";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 
 const sigmaLogo = require("../../assets/logo2.png");
@@ -58,7 +61,9 @@ function LoginField({
 
 export function LoginScreen() {
   const { height, width } = useWindowDimensions();
-  const [username, setUsername] = useState("");
+  const backendConfig = getBackendConfig();
+  const { authError, clearAuthError, isSubmitting, signInWithPassword } = useAuthSession();
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const isCompact = height <= 780;
@@ -67,8 +72,9 @@ export function LoginScreen() {
   const logoWidth = Math.min(width * 0.62, isShort ? 240 : isCompact ? 278 : 316);
   const logoHeight = isShort ? 124 : isCompact ? 146 : 170;
 
-  const enterApp = () => {
-    router.replace("/(tabs)/home");
+  const handleSignIn = async () => {
+    clearAuthError();
+    await signInWithPassword(email, password);
   };
 
   return (
@@ -81,7 +87,12 @@ export function LoginScreen() {
           keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
         >
           <View style={styles.screenFrame}>
-            <View style={[styles.hero, { minHeight: heroHeight, paddingTop: isShort ? spacing.lg : spacing.xl }]}>
+            <View
+              style={[
+                styles.hero,
+                { minHeight: heroHeight, paddingTop: isShort ? spacing.lg : spacing.xl },
+              ]}
+            >
               <View style={[styles.orb, styles.orbPrimary]} />
               <View style={[styles.orb, styles.orbSecondary]} />
               <View style={[styles.orb, styles.orbTertiary]} />
@@ -92,27 +103,25 @@ export function LoginScreen() {
               />
             </View>
 
-            <View
-              style={[
-                styles.card,
-                isCompact && styles.cardCompact,
-                isShort && styles.cardShort,
-              ]}
-            >
+            <View style={[styles.card, isCompact && styles.cardCompact, isShort && styles.cardShort]}>
               <Text style={[styles.title, isShort && styles.titleCompact]}>Bem-vindo</Text>
               <Text style={[styles.subtitle, isCompact && styles.subtitleCompact]}>
-                Faça login para continuar
+                Entre com seu email corporativo para restaurar a sessao e acessar o backend
+                persistente.
               </Text>
 
               <View style={[styles.formBlock, isCompact && styles.formBlockCompact]}>
                 <View style={styles.labelBlock}>
-                  <Text style={styles.label}>Usuário</Text>
+                  <Text style={styles.label}>Email corporativo</Text>
                   <LoginField
                     compact={isCompact}
-                    icon="user"
-                    placeholder="Digite seu usuário"
-                    value={username}
-                    onChangeText={setUsername}
+                    icon="mail"
+                    placeholder="nome@sigma.local"
+                    value={email}
+                    onChangeText={(value) => {
+                      clearAuthError();
+                      setEmail(value);
+                    }}
                   />
                 </View>
 
@@ -123,7 +132,10 @@ export function LoginScreen() {
                     icon="lock"
                     placeholder="Digite sua senha"
                     value={password}
-                    onChangeText={setPassword}
+                    onChangeText={(value) => {
+                      clearAuthError();
+                      setPassword(value);
+                    }}
                     secureTextEntry={!showPassword}
                     trailing={
                       <Pressable
@@ -141,38 +153,56 @@ export function LoginScreen() {
                   />
                 </View>
 
-                <Pressable style={styles.forgotAction} onPress={() => undefined}>
+                {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
+
+                {!backendConfig.isConfigured ? (
+                  <Text style={styles.backendHint}>
+                    Backend nao configurado. Preencha EXPO_PUBLIC_SUPABASE_URL e
+                    EXPO_PUBLIC_SUPABASE_ANON_KEY antes de autenticar.
+                  </Text>
+                ) : null}
+
+                <Pressable
+                  style={styles.forgotAction}
+                  onPress={() =>
+                    Alert.alert(
+                      "Redefinicao de senha",
+                      "Enquanto o fluxo automatizado nao entra, a troca de senha deve ser feita pela administracao do Supabase/Auth."
+                    )
+                  }
+                >
                   <Text style={styles.forgotText}>Esqueceu a senha?</Text>
                 </Pressable>
               </View>
 
               <View style={[styles.actionsBlock, isCompact && styles.actionsBlockCompact]}>
-                <Pressable onPress={enterApp} style={styles.primaryButtonShadow}>
+                <Pressable
+                  onPress={() => void handleSignIn()}
+                  style={styles.primaryButtonShadow}
+                  disabled={isSubmitting || !backendConfig.isConfigured}
+                >
                   <LinearGradient
                     colors={["#3E7B1D", "#1E4B10"]}
                     start={{ x: 0, y: 0.5 }}
                     end={{ x: 1, y: 0.5 }}
-                    style={[styles.primaryButton, isCompact && styles.actionButtonCompact]}
+                    style={[
+                      styles.primaryButton,
+                      isCompact && styles.actionButtonCompact,
+                      (isSubmitting || !backendConfig.isConfigured) && styles.primaryButtonDisabled,
+                    ]}
                   >
-                    <Text style={styles.primaryButtonText}>Entrar</Text>
+                    {isSubmitting ? (
+                      <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                      <Text style={styles.primaryButtonText}>Entrar</Text>
+                    )}
                   </LinearGradient>
-                </Pressable>
-
-                <View style={styles.dividerRow}>
-                  <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>OU</Text>
-                  <View style={styles.dividerLine} />
-                </View>
-
-                <Pressable
-                  style={[styles.secondaryButton, isCompact && styles.actionButtonCompact]}
-                  onPress={enterApp}
-                >
-                  <Text style={styles.secondaryButtonText}>Acessar sem login</Text>
                 </Pressable>
               </View>
 
-              <Text style={[styles.footer, isCompact && styles.footerCompact]}>Sigma Lithium (c) 2026</Text>
+              <Text style={[styles.footer, isCompact && styles.footerCompact]}>
+                Sigma Lithium (c) 2026
+              </Text>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -270,6 +300,7 @@ const styles = StyleSheet.create({
     marginTop: -spacing.sm,
     color: "#7B8089",
     fontSize: typography.body,
+    lineHeight: 22,
   },
   subtitleCompact: {
     fontSize: typography.bodySmall,
@@ -312,6 +343,17 @@ const styles = StyleSheet.create({
     fontSize: typography.bodySmall,
     paddingVertical: spacing.xs,
   },
+  errorText: {
+    color: colors.danger,
+    fontSize: typography.bodySmall,
+    lineHeight: 20,
+    fontWeight: "600",
+  },
+  backendHint: {
+    color: colors.textSecondary,
+    fontSize: typography.caption,
+    lineHeight: 18,
+  },
   forgotAction: {
     alignSelf: "flex-end",
     paddingVertical: 2,
@@ -337,39 +379,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  primaryButtonDisabled: {
+    opacity: 0.6,
+  },
   actionButtonCompact: {
     minHeight: 48,
   },
   primaryButtonText: {
     color: colors.white,
-    fontSize: typography.body,
-    fontWeight: "800",
-  },
-  dividerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#E1E5EB",
-  },
-  dividerText: {
-    color: "#8B9098",
-    fontSize: typography.bodySmall,
-    fontWeight: "700",
-  },
-  secondaryButton: {
-    minHeight: 54,
-    borderRadius: radius.pill,
-    borderWidth: 2,
-    borderColor: "#30591D",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  secondaryButtonText: {
-    color: "#30591D",
     fontSize: typography.body,
     fontWeight: "800",
   },
@@ -384,4 +401,3 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
   },
 });
-

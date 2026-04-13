@@ -1,8 +1,8 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { useAuthSession } from "@/hooks/useAuthSession";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, spacing, typography } from "@/theme";
@@ -21,7 +21,16 @@ export function PageHeader({
   rightContent,
 }: PageHeaderProps) {
   const { currentUserName } = useReservationStore();
+  const { isSubmitting, signOut } = useAuthSession();
   const insets = useSafeAreaInsets();
+
+  const handleSignOut = async () => {
+    const result = await signOut();
+
+    if (!result.success && result.message) {
+      Alert.alert("Falha ao encerrar sessao", result.message);
+    }
+  };
 
   return (
     <LinearGradient
@@ -43,7 +52,8 @@ export function PageHeader({
               <View style={styles.divider} />
               <Pressable
                 accessibilityRole="button"
-                onPress={() => router.replace("/")}
+                disabled={isSubmitting}
+                onPress={() => void handleSignOut()}
                 style={styles.exitButton}
               >
                 <Feather name="log-out" size={12} color={colors.white} />

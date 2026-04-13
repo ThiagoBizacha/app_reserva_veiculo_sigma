@@ -25,6 +25,7 @@ export interface NewUserPayload {
 export interface User {
   id: string;
   userId: string;
+  authUserId?: string;
   name: string;
   fullName: string;
   cpf: string;

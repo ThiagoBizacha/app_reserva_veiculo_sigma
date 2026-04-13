@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Alert, Pressable, StyleSheet, Text } from "react-native";
+import { useAuthSession } from "@/hooks/useAuthSession";
 import { colors, radius, spacing, typography } from "@/theme";
 
 interface ExitHeaderButtonProps {
@@ -13,11 +13,21 @@ export function ExitHeaderButton({
   compact = false,
 }: ExitHeaderButtonProps) {
   const isLight = variant === "light";
+  const { isSubmitting, signOut } = useAuthSession();
+
+  const handleSignOut = async () => {
+    const result = await signOut();
+
+    if (!result.success && result.message) {
+      Alert.alert("Falha ao encerrar sessao", result.message);
+    }
+  };
 
   return (
     <Pressable
       accessibilityRole="button"
-      onPress={() => router.replace("/")}
+      disabled={isSubmitting}
+      onPress={() => void handleSignOut()}
       style={[
         styles.button,
         compact && styles.compactButton,
