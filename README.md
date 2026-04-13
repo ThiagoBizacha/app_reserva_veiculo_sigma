@@ -2,10 +2,12 @@
 
 Aplicativo interno em React Native + Expo para reserva corporativa de veiculos.
 
+**App em produção:** https://dist-six-lyart-17.vercel.app
+
 As etapas `B03` e `B01` agora estao estruturadas no codigo:
 
 - `B03`: backend persistente e multiusuario com Supabase como fonte unica de verdade
-- `B01`: autenticacao real com Supabase Auth, sessao persistida e rotas protegidas
+- `B01`: autenticacao real com Supabase Auth, sessao persistida, rotas protegidas e troca obrigatoria da senha temporaria no primeiro acesso
 
 ## Estado atual
 
@@ -15,6 +17,7 @@ O app agora foi estruturado para:
 - manter `AsyncStorage` apenas como cache auxiliar e persistencia de sessao no mobile;
 - exigir sessao autenticada para entrar no app;
 - restaurar a sessao ao reabrir o app;
+- obrigar a troca da senha temporaria no primeiro login;
 - persistir criacao de reserva, cancelamento, check-in e check-out no backend;
 - refletir a mesma fonte de verdade em Agenda, Minhas Reservas, Frota, Painel e Detalhes.
 
@@ -118,9 +121,37 @@ Esse script:
 - le os usuarios ja persistidos em `public.users`;
 - cria usuarios equivalentes no `Supabase Auth`;
 - marca o email como confirmado;
+- marca `must_change_password = true` para primeiro acesso quando o usuario ainda nao trocou a senha definitiva;
 - grava `auth_user_id` em `public.users`.
 
 Todos os usuarios provisionados recebem a mesma senha temporaria definida em `SUPABASE_AUTH_TEMP_PASSWORD`.
+No primeiro login com essa senha, o app redireciona para a tela de definicao da senha definitiva, que agora aceita senha numerica com minimo de 4 digitos.
+
+## Deploy web (produção)
+
+O app está publicado em:
+
+```
+https://dist-six-lyart-17.vercel.app
+```
+
+Qualquer pessoa abre o link no celular, faz login com email e senha, e usa o app.
+Para adicionar o ícone na tela inicial: Chrome → menu ⋮ → "Adicionar à tela inicial".
+
+### Atualizar o app em produção
+
+Após fazer mudanças no código, rode na raiz do projeto:
+
+```bash
+npm run build:web
+```
+
+Depois faça o deploy:
+
+```bash
+cd dist
+npx vercel --prod --yes
+```
 
 ## Como rodar o app
 
@@ -175,18 +206,21 @@ Checklist manual recomendado para homologacao de `B01` + `B03`:
 3. Rodar `npm run auth:provision:supabase`.
 4. Abrir o app sem sessao e confirmar que a tela inicial e o login.
 5. Fazer login com email e senha temporaria.
-6. Fechar o app e abrir novamente para confirmar restauracao da sessao.
-7. Criar uma reserva.
-8. Confirmar a mesma reserva em Minhas Reservas, Agenda, Frota e Detalhe.
-9. Fazer check-in.
-10. Confirmar status `Em uso`.
-11. Fazer check-out.
-12. Confirmar status `Concluida`.
-13. Fazer logout e confirmar retorno para a tela de login.
+6. Confirmar redirecionamento obrigatorio para a tela de nova senha.
+7. Definir a senha definitiva no proprio app.
+8. Fechar o app e abrir novamente para confirmar restauracao da sessao.
+9. Criar uma reserva.
+10. Confirmar a mesma reserva em Minhas Reservas, Agenda, Frota e Detalhe.
+11. Fazer check-in.
+12. Confirmar status `Em uso`.
+13. Fazer check-out.
+14. Confirmar status `Concluida`.
+15. Fazer logout e confirmar retorno para a tela de login.
 
 ## Decisoes tecnicas
 
 - `src/hooks/useAuthSession.tsx` concentra sessao, `signInWithPassword`, `signOut`, restauracao e observacao de mudancas de auth.
+- `src/hooks/useAuthSession.tsx` tambem concentra a obrigacao de troca da senha temporaria e a atualizacao da senha definitiva via `Supabase Auth`.
 - `src/hooks/useReservationStore.tsx` continua sendo a API de consumo das telas, mas agora depende da sessao autenticada para sincronizar o backend.
 - O usuario corrente deixou de vir de `EXPO_PUBLIC_DEFAULT_USER_ID`. O app resolve o colaborador pelo `auth_user_id`, com fallback por email para vinculo inicial.
 - O app mobile persiste a sessao via AsyncStorage. Na web, a sessao usa o storage do navegador.
