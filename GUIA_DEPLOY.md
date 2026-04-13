@@ -68,6 +68,19 @@ Antes de cada rebuild de produção, atualize em `app.json`:
 
 ## Deploy Web (navegador)
 
+**URL de produção:** [https://sigma-reserva.vercel.app](https://sigma-reserva.vercel.app)
+Projeto Vercel: `sigma-reserva` (thiagobizachas-projects)
+
+### Publicar nova versão
+
+```bash
+# 1. Na raiz do projeto — gera o bundle
+npm run build:web
+
+# 2. Deploy para o projeto sigma-reserva
+cd dist && npx vercel --prod --yes && cd ..
+```
+
 ### Gerar o bundle estático
 
 ```bash
@@ -166,6 +179,9 @@ eas update --branch production --message "descrição"
 
 # Build web estático
 npm run build:web
+
+# Deploy web para produção (projeto sigma-reserva no Vercel)
+cd dist && npx vercel --prod --yes && cd ..
 
 # Servir web localmente para testes
 npx serve dist/

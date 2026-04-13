@@ -130,9 +130,7 @@ No primeiro login com essa senha, o app redireciona para a tela de definicao da 
 
 O app está publicado em:
 
-```
-https://distnew-psi.vercel.app
-```
+**[https://sigma-reserva.vercel.app](https://sigma-reserva.vercel.app)**
 
 Qualquer pessoa abre o link no celular, faz login com email e senha, e usa o app.
 Para adicionar o ícone na tela inicial: Chrome → menu ⋮ → "Adicionar à tela inicial".
