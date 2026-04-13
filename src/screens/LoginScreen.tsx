@@ -104,11 +104,6 @@ export function LoginScreen() {
 
             <View style={[styles.card, isCompact && styles.cardCompact, isShort && styles.cardShort]}>
               <Text style={[styles.title, isShort && styles.titleCompact]}>Bem-vindo</Text>
-              <Text style={[styles.subtitle, isCompact && styles.subtitleCompact]}>
-                Entre com seu email corporativo para restaurar a sessao e acessar o backend
-                persistente.
-              </Text>
-
               <View style={[styles.formBlock, isCompact && styles.formBlockCompact]}>
                 <View style={styles.labelBlock}>
                   <Text style={styles.label}>Email corporativo</Text>
@@ -161,7 +156,7 @@ export function LoginScreen() {
                   </Text>
                 ) : null}
                 <Text style={styles.tempPasswordHint}>
-                  Primeiro acesso: entre com a senha temporaria e o app vai exigir a definicao da senha definitiva antes de liberar o uso.
+                  No primeiro acesso, use a senha temporaria e crie sua senha.
                 </Text>
               </View>
 

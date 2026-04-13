@@ -128,27 +128,24 @@ No primeiro login com essa senha, o app redireciona para a tela de definicao da 
 
 ## Deploy web (produção)
 
-O app está publicado em:
+**App em produção:** [https://sigma-reserva.vercel.app](https://sigma-reserva.vercel.app)
 
-**[https://sigma-reserva.vercel.app](https://sigma-reserva.vercel.app)**
-
-Qualquer pessoa abre o link no celular, faz login com email e senha, e usa o app.
+Projeto Vercel: `sigma-reserva` — qualquer celular abre o link, faz login e usa o app.
 Para adicionar o ícone na tela inicial: Chrome → menu ⋮ → "Adicionar à tela inicial".
 
-### Atualizar o app em produção
+### Publicar atualização
 
-Após fazer mudanças no código, rode na raiz do projeto:
+Após alterar o código, rode os 2 comandos abaixo na raiz do projeto:
 
 ```bash
+# 1. Gera o bundle web atualizado
 npm run build:web
+
+# 2. Faz o deploy para https://sigma-reserva.vercel.app
+cd dist && npx vercel --prod --yes && cd ..
 ```
 
-Depois faça o deploy:
-
-```bash
-cd dist
-npx vercel --prod --yes
-```
+O link permanece o mesmo após cada deploy — não precisa repassar para os usuários.
 
 ## Como rodar o app
 
