@@ -78,8 +78,14 @@ export function ReservationOperationScreen({
   reservationId,
   mode,
 }: ReservationOperationScreenProps) {
-  const { reservations, resources, currentUserName, checkInReservation, checkOutReservation } =
-    useReservationStore();
+  const {
+    reservations,
+    resources,
+    currentUserName,
+    checkInReservation,
+    checkOutReservation,
+    isMutating,
+  } = useReservationStore();
   const reservation = reservations.find((item) => item.id === reservationId);
   const resource = reservation ? getResourceById(resources, reservation.resourceId) : undefined;
   const resolvedMode = useMemo<"checkin" | "checkout">(() => {
@@ -224,7 +230,7 @@ export function ReservationOperationScreen({
   const stepWarning = getStepWarning();
   const footerNotice = feedback ?? (stepWarning ? { type: "error" as const, message: stepWarning } : null);
 
-  const handlePrimaryAction = () => {
+  const handlePrimaryAction = async () => {
     if (stepWarning) {
       setFeedback({ type: "error", message: stepWarning });
       return;
@@ -259,10 +265,11 @@ export function ReservationOperationScreen({
       counterpartyName,
     };
 
-    const result =
+    const result = await (
       resolvedMode === "checkin"
         ? checkInReservation(reservation.id, payload)
-        : checkOutReservation(reservation.id, payload);
+        : checkOutReservation(reservation.id, payload)
+    );
 
     setFeedback({ type: result.success ? "success" : "error", message: result.message });
 
@@ -722,12 +729,16 @@ export function ReservationOperationScreen({
           <Pressable
             style={[
               styles.primaryFooterAction,
-              stepWarning && styles.primaryFooterActionDisabled,
+              (stepWarning || isMutating) && styles.primaryFooterActionDisabled,
             ]}
-            onPress={handlePrimaryAction}
-            disabled={Boolean(stepWarning)}
+            onPress={() => {
+              void handlePrimaryAction();
+            }}
+            disabled={Boolean(stepWarning) || isMutating}
           >
-            <Text style={styles.primaryFooterActionText}>{primaryLabel}</Text>
+            <Text style={styles.primaryFooterActionText}>
+              {isMutating ? "Salvando..." : primaryLabel}
+            </Text>
           </Pressable>
         </View>
       </View>

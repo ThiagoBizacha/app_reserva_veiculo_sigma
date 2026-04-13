@@ -29,7 +29,7 @@ interface ReservationDetailScreenProps {
 }
 
 export function ReservationDetailScreen({ reservationId }: ReservationDetailScreenProps) {
-  const { reservations, resources, users, cancelReservation } = useReservationStore();
+  const { reservations, resources, users, cancelReservation, isMutating } = useReservationStore();
   const [feedback, setFeedback] = useState<string | null>(null);
   const reservation = reservations.find((item) => item.id === reservationId);
 
@@ -57,8 +57,8 @@ export function ReservationDetailScreen({ reservationId }: ReservationDetailScre
   const canStartCheckIn = reservation.status === "Reservado" && isScheduledReservationActive(reservation);
   const canCancelReservation = reservation.status === "Reservado" && isScheduledReservationActive(reservation);
 
-  const handleCancelReservation = () => {
-    const result = cancelReservation(reservation.id);
+  const handleCancelReservation = async () => {
+    const result = await cancelReservation(reservation.id);
     setFeedback(result.message);
   };
 
@@ -116,7 +116,12 @@ export function ReservationDetailScreen({ reservationId }: ReservationDetailScre
       ) : null}
 
       {canCancelReservation ? (
-        <SecondaryButton label="Cancelar reserva" onPress={handleCancelReservation} />
+        <SecondaryButton
+          label={isMutating ? "Cancelando..." : "Cancelar reserva"}
+          onPress={() => {
+            void handleCancelReservation();
+          }}
+        />
       ) : null}
 
       {feedback ? (

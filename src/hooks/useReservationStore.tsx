@@ -1,61 +1,51 @@
-﻿import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
-  currentUserId,
-  reservations as initialReservations,
-  resources as initialResources,
-  users as initialUsers,
-} from "@/data";
+  type PropsWithChildren,
+  createContext,
+  startTransition,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { AppState, Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import type {
   NewReservationPayload,
   NewUserPayload,
   NewVehiclePayload,
   Reservation,
-  ReservationInspection,
   ReservationOperationPayload,
   Resource,
   ResourceStatus,
   User,
 } from "@/types";
 import {
-  type PropsWithChildren,
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-import {
   type CalendarDayState,
   getActionableReservationsForUser,
-  isScheduledReservationActive,
   getCurrentResourceStatus,
   getFleetSummary,
   getResourceAvailabilityForDate,
-  getResourceConflicts,
   getResourceReservations,
   getReservationsForResourceDay,
-  isResourceInMaintenanceOnDate,
 } from "@/utils/reservations";
-import { getDurationHours, isSameCalendarDay } from "@/utils/date";
-import { buildReservationsCsv, downloadCsvForExcel } from "@/utils/export";
+import { colors, radius, spacing, typography } from "@/theme";
+import { getBackendConfig } from "@/backend/config";
+import { fetchRemoteAppState, subscribeToRemoteAppState } from "@/backend/appState";
+import { readCachedAppState, writeCachedAppState } from "@/backend/cache";
 import {
-  hasSignature,
-  parseMileageValue,
-} from "@/utils/operation";
-import {
-  getNextReservationCode,
-  normalizeReservationCodes,
-} from "@/utils/reservationCode";
-import { findUserByReference } from "@/utils/users";
-
-interface ActionResult {
-  success: boolean;
-  message: string;
-  reservation?: Reservation;
-  resource?: Resource;
-  user?: User;
-  fileUri?: string;
-}
+  type ActionResult,
+  cancelReservationUseCase,
+  checkInReservationUseCase,
+  checkOutReservationUseCase,
+  createReservationUseCase,
+  createUserUseCase,
+  createVehicleUseCase,
+  exportReservationsReportUseCase,
+  toggleResourceMaintenanceUseCase,
+  updateUserUseCase,
+  updateVehicleUseCase,
+} from "@/services/reservationService";
 
 interface ReservationStoreValue {
   users: User[];
@@ -64,15 +54,29 @@ interface ReservationStoreValue {
   currentUser: User;
   currentUserId: string;
   currentUserName: string;
-  toggleResourceMaintenance: (resourceId: string) => void;
-  createVehicle: (payload: NewVehiclePayload) => ActionResult;
-  createUser: (payload: NewUserPayload) => ActionResult;
-  updateVehicle: (resourceId: string, payload: NewVehiclePayload) => ActionResult;
-  updateUser: (userId: string, payload: NewUserPayload) => ActionResult;
-  createReservation: (payload: NewReservationPayload) => ActionResult;
-  cancelReservation: (reservationId: string) => ActionResult;
-  checkInReservation: (reservationId: string, payload: ReservationOperationPayload) => ActionResult;
-  checkOutReservation: (reservationId: string, payload: ReservationOperationPayload) => ActionResult;
+  isBootstrapping: boolean;
+  isRefreshing: boolean;
+  isMutating: boolean;
+  isBackendConfigured: boolean;
+  isUsingCachedData: boolean;
+  syncError: string | null;
+  lastSyncedAt?: string;
+  refreshRemoteState: () => Promise<void>;
+  toggleResourceMaintenance: (resourceId: string) => Promise<ActionResult>;
+  createVehicle: (payload: NewVehiclePayload) => Promise<ActionResult>;
+  createUser: (payload: NewUserPayload) => Promise<ActionResult>;
+  updateVehicle: (resourceId: string, payload: NewVehiclePayload) => Promise<ActionResult>;
+  updateUser: (userId: string, payload: NewUserPayload) => Promise<ActionResult>;
+  createReservation: (payload: NewReservationPayload) => Promise<ActionResult>;
+  cancelReservation: (reservationId: string) => Promise<ActionResult>;
+  checkInReservation: (
+    reservationId: string,
+    payload: ReservationOperationPayload
+  ) => Promise<ActionResult>;
+  checkOutReservation: (
+    reservationId: string,
+    payload: ReservationOperationPayload
+  ) => Promise<ActionResult>;
   exportReservationsReport: () => Promise<ActionResult>;
   getResourceStatus: (resourceId: string, referenceDate?: Date) => ResourceStatus;
   getReservationsForResource: (resourceId: string) => Reservation[];
@@ -91,786 +95,410 @@ interface ReservationStoreValue {
   };
 }
 
-const STORAGE_KEYS = {
-  mockeersion: "@sigma-reserva/mock-version",
-  reservations: "@sigma-reserva/reservations",
-  resources: "@sigma-reserva/resources",
-  users: "@sigma-reserva/users",
+const EMPTY_USER: User = {
+  id: "unconfigured-user",
+  userId: "unconfigured-user",
+  name: "Usuario",
+  fullName: "Usuario nao configurado",
+  cpf: "",
+  gestorVeiculo: false,
+  matricula: "",
+  matriz: "",
+  role: "Solicitante",
+  area: "",
+  areaDepartamento: "",
+  centroCusto: "",
+  email: "",
+  emailCorporativo: "",
+  telefone: "",
+  cnhNumero: "",
+  cnhCategoria: "",
+  cnhUfEmissao: "",
+  cnhStatus: "Válida",
+  cnhDataUltimaValidacao: new Date(0).toISOString(),
+  cnhAnexo: "",
+  termosPaytrack: false,
 };
-
-const MOCK_DATA_eERSION = "2026-04-01-clean-reservation-base-v1";
-
-const freshStartResources = initialResources.map((resource) =>
-  resource.category === "Veiculo"
-    ? {
-        ...resource,
-        status: "Disponivel" as const,
-        nextAvailableAt: undefined,
-      }
-    : resource
-);
 
 const ReservationStoreContext = createContext<ReservationStoreValue | null>(null);
 
 export function ReservationStoreProvider({ children }: PropsWithChildren) {
-  const [usersData, setUsersData] = useState(initialUsers);
-  const [resources, setResources] = useState(freshStartResources);
-  const [reservations, setReservations] = useState(() => normalizeReservationCodes(initialReservations));
-  const [isHydrated, setIsHydrated] = useState(false);
+  const backendConfig = getBackendConfig();
+  const [users, setUsers] = useState<User[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isMutating, setIsMutating] = useState(false);
+  const [isUsingCachedData, setIsUsingCachedData] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | undefined>(undefined);
+  const realtimeRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentUser =
-    usersData.find((user) => user.id === currentUserId) ?? usersData[0] ?? initialUsers[0];
-  const currentUserName = currentUser?.name ?? "Usuario";
+    users.find((user) => user.id === backendConfig.defaultUserId) ?? users[0] ?? EMPTY_USER;
+  const currentUserId = currentUser.id;
+  const currentUserName = currentUser.name || "Usuario";
+  const hasMinimumData = users.length > 0;
+
+  const applySnapshot = useCallback(
+    async (
+      snapshot: {
+        users: User[];
+        resources: Resource[];
+        reservations: Reservation[];
+        syncedAt?: string;
+      },
+      source: "cache" | "remote"
+    ) => {
+      startTransition(() => {
+        setUsers(snapshot.users);
+        setResources(snapshot.resources);
+        setReservations(snapshot.reservations);
+        setIsUsingCachedData(source === "cache");
+        setLastSyncedAt(snapshot.syncedAt);
+      });
+
+      if (source === "remote") {
+        await writeCachedAppState({
+          cachedAt: snapshot.syncedAt ?? new Date().toISOString(),
+          users: snapshot.users,
+          resources: snapshot.resources,
+          reservations: snapshot.reservations,
+        });
+      }
+    },
+    []
+  );
+
+  const mergeActionResultIntoState = useCallback(
+    async (result: ActionResult) => {
+      if (result.user) {
+        const nextUsers = [
+          result.user,
+          ...users.filter((item) => item.id !== result.user?.id),
+        ].sort((left, right) => left.fullName.localeCompare(right.fullName, "pt-BR"));
+        setUsers(nextUsers);
+        await writeCachedAppState({
+          cachedAt: new Date().toISOString(),
+          users: nextUsers,
+          resources,
+          reservations,
+        });
+      }
+
+      if (result.resource) {
+        const nextResources = [
+          result.resource,
+          ...resources.filter((item) => item.id !== result.resource?.id),
+        ].sort((left, right) => left.code.localeCompare(right.code, "pt-BR"));
+        setResources(nextResources);
+        await writeCachedAppState({
+          cachedAt: new Date().toISOString(),
+          users,
+          resources: nextResources,
+          reservations,
+        });
+      }
+
+      if (result.reservation) {
+        const nextReservations = [
+          result.reservation,
+          ...reservations.filter((item) => item.id !== result.reservation?.id),
+        ].sort(
+          (left, right) =>
+            new Date(right.startDate).getTime() - new Date(left.startDate).getTime()
+        );
+        setReservations(nextReservations);
+        await writeCachedAppState({
+          cachedAt: new Date().toISOString(),
+          users,
+          resources,
+          reservations: nextReservations,
+        });
+      }
+    },
+    [reservations, resources, users]
+  );
+
+  const refreshRemoteState = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!backendConfig.isConfigured) {
+        setSyncError(
+          "Backend nao configurado. Defina EXPO_PUBLIC_SUPABASE_URL e EXPO_PUBLIC_SUPABASE_ANON_KEY."
+        );
+        setIsBootstrapping(false);
+        return;
+      }
+
+      if (!options?.silent) {
+        setIsRefreshing(true);
+      }
+
+      try {
+        const snapshot = await fetchRemoteAppState();
+        await applySnapshot(snapshot, "remote");
+        setSyncError(null);
+      } catch (error) {
+        const nextMessage =
+          error instanceof Error
+            ? error.message
+            : "Nao foi possivel sincronizar os dados com o backend.";
+        setSyncError(nextMessage);
+      } finally {
+        setIsRefreshing(false);
+        setIsBootstrapping(false);
+      }
+    },
+    [applySnapshot, backendConfig.isConfigured]
+  );
 
   useEffect(() => {
     let active = true;
 
-    const hydrate = async () => {
-      try {
-        const [storedeersion, storedReservations, storedResources, storedUsers] = await AsyncStorage.multiGet([
-          STORAGE_KEYS.mockeersion,
-          STORAGE_KEYS.reservations,
-          STORAGE_KEYS.resources,
-          STORAGE_KEYS.users,
-        ]);
+    const bootstrap = async () => {
+      const cachedState = await readCachedAppState();
 
-        if (!active) {
-          return;
-        }
+      if (!active) {
+        return;
+      }
 
-        const versionealue = storedeersion[1];
-        const reservationsealue = storedReservations[1];
-        const resourcesealue = storedResources[1];
-        const usersealue = storedUsers[1];
-        const shouldResetToLatestMocks = versionealue !== MOCK_DATA_eERSION;
+      if (cachedState) {
+        await applySnapshot(
+          {
+            users: cachedState.users,
+            resources: cachedState.resources,
+            reservations: cachedState.reservations,
+            syncedAt: cachedState.cachedAt,
+          },
+          "cache"
+        );
+      }
 
-        if (shouldResetToLatestMocks) {
-          const nextUsers = usersealue ? (JSON.parse(usersealue) as User[]) : initialUsers;
+      await refreshRemoteState({ silent: !cachedState });
 
-          setUsersData(nextUsers);
-          setReservations(normalizeReservationCodes(initialReservations));
-          setResources(freshStartResources);
-          await AsyncStorage.multiSet([
-            [STORAGE_KEYS.mockeersion, MOCK_DATA_eERSION],
-            [STORAGE_KEYS.reservations, JSON.stringify(normalizeReservationCodes(initialReservations))],
-            [STORAGE_KEYS.resources, JSON.stringify(freshStartResources)],
-            [STORAGE_KEYS.users, JSON.stringify(nextUsers)],
-          ]);
-          return;
-        }
-
-        if (reservationsealue) {
-          setReservations(normalizeReservationCodes(JSON.parse(reservationsealue) as Reservation[]));
-        }
-
-        if (resourcesealue) {
-          setResources(JSON.parse(resourcesealue));
-        }
-
-        if (usersealue) {
-          setUsersData(JSON.parse(usersealue));
-        }
-      } catch {
-        // Keep bundled mocks when local storage is unavailable.
-      } finally {
-        if (active) {
-          setIsHydrated(true);
-        }
+      if (active) {
+        setIsBootstrapping(false);
       }
     };
 
-    void hydrate();
+    void bootstrap();
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [applySnapshot, refreshRemoteState]);
 
   useEffect(() => {
-    if (!isHydrated) {
+    if (!backendConfig.isConfigured) {
       return;
     }
 
-    void AsyncStorage.multiSet([
-      [STORAGE_KEYS.mockeersion, MOCK_DATA_eERSION],
-      [STORAGE_KEYS.reservations, JSON.stringify(reservations)],
-      [STORAGE_KEYS.resources, JSON.stringify(resources)],
-      [STORAGE_KEYS.users, JSON.stringify(usersData)],
-    ]);
-  }, [isHydrated, reservations, resources, usersData]);
-
-  const appendHistoryItem = (
-    reservation: Reservation,
-    label: string,
-    note?: string
-  ): Reservation["history"] => [
-    {
-      id: `hist-${Date.now()}`,
-      label,
-      timestamp: new Date().toISOString(),
-      actor: currentUserName,
-      note,
-    },
-    ...reservation.history,
-  ];
-
-  const getResourceStatus = (resourceId: string, referenceDate = new Date()) => {
-    const resource = resources.find((item) => item.id === resourceId);
-    if (!resource) {
-      return "Disponivel" as const;
-    }
-
-    return getCurrentResourceStatus(resource, reservations, referenceDate);
-  };
-
-  const getReservationsForResource = (resourceId: string) =>
-    getResourceReservations(reservations, resourceId);
-
-  const getReservationsForDay = (resourceId: string, date: Date) =>
-    getReservationsForResourceDay(reservations, resourceId, date);
-
-  const getAvailabilityForDate = (resourceId: string, date: Date) => {
-    const resource = resources.find((item) => item.id === resourceId);
-
-    if (!resource) {
-      return { state: "disponivel" as const, reservations: [], isAvailable: false };
-    }
-
-    return getResourceAvailabilityForDate(resource, reservations, date);
-  };
-
-  const getActionableReservations = () =>
-    getActionableReservationsForUser(reservations, currentUserId);
-
-  const getSummary = (referenceDate = new Date()) =>
-    getFleetSummary(resources, reservations, referenceDate);
-
-  const toggleResourceMaintenance = (resourceId: string) => {
-    setResources((current) =>
-      current.map((resource) =>
-        resource.id === resourceId
-          ? {
-              ...resource,
-              status: resource.status === "Manutencao" ? "Disponivel" : "Manutencao",
-              nextAvailableAt:
-                resource.status === "Manutencao"
-                  ? undefined
-                  : new Date(
-                      new Date().getFullYear(),
-                      new Date().getMonth(),
-                      new Date().getDate() + 3,
-                      18,
-                      0,
-                      0
-                    ).toISOString(),
-            }
-          : resource
-      )
-    );
-  };
-
-  const validateVehiclePayload = (payload: NewVehiclePayload, resourceId?: string) => {
-    const requiredFields = [
-      payload.name,
-      payload.code,
-      payload.plate,
-      payload.brand,
-      payload.model,
-      payload.year,
-      payload.currentMileage,
-      payload.description,
-    ];
-
-    if (requiredFields.some((field) => !field.trim())) {
-      return "Preencha todos os campos obrigatórios do veículo.";
-    }
-
-    if (
-      resources.some(
-        (item) =>
-          item.id !== resourceId && item.code.toLowerCase() === payload.code.trim().toLowerCase()
-      )
-    ) {
-      return "Já existe um veículo com esse código.";
-    }
-
-    if (
-      resources.some(
-        (item) =>
-          item.id !== resourceId &&
-          item.plate?.toLowerCase() === payload.plate.trim().toLowerCase()
-      )
-    ) {
-      return "Já existe um veículo com essa placa.";
-    }
-
-    return null;
-  };
-
-  const buildVehicleRecord = (
-    payload: NewVehiclePayload,
-    existingResource?: Resource
-  ): Resource => {
-    const vehicleCount = resources.filter((item) => item.category === "Veiculo").length + 1;
-    const normalizedName = payload.name.trim();
-    const normalizedCode = payload.code.trim().toUpperCase();
-    const normalizedPlate = payload.plate.trim().toUpperCase();
-    const normalizedBrand = payload.brand.trim();
-    const normalizedModel = payload.model.trim();
-    const normalizedMileage = payload.currentMileage.trim();
-
-    return {
-      id: existingResource?.id ?? `res-${Date.now()}`,
-      vehicleId:
-        existingResource?.vehicleId ?? `VEH-${String(vehicleCount).padStart(3, "0")}`,
-      name: normalizedName,
-      code: normalizedCode,
-      category: existingResource?.category ?? "Veiculo",
-      status: existingResource?.status ?? "Disponivel",
-      plate: normalizedPlate,
-      model: normalizedModel,
-      brand: normalizedBrand,
-      year: payload.year.trim(),
-      rentalCompany: payload.rentalCompany?.trim() || "Cadastro interno",
-      vehicleCategory: payload.vehicleCategory,
-      currentMileage: normalizedMileage,
-      lastInspectionDate: existingResource?.lastInspectionDate ?? new Date().toISOString(),
-      vehicleDocumentAttachment: payload.vehicleDocumentAttachment?.trim() || "",
-      vehiclePhotoAttachments: existingResource?.vehiclePhotoAttachments ?? [],
-      lastMaintenanceDate: existingResource?.lastMaintenanceDate ?? new Date().toISOString(),
-      nextMaintenanceDate: payload.nextMaintenanceDate?.trim() || undefined,
-      lastMaintenanceMileage: existingResource?.lastMaintenanceMileage ?? normalizedMileage,
-      nextMaintenanceMileage: payload.nextMaintenanceMileage?.trim() || undefined,
-      observation: payload.observation?.trim() || undefined,
-      location: payload.location?.trim() || existingResource?.location || "Base interna",
-      capacity: existingResource?.capacity ?? "5 lugares",
-      description: payload.description.trim(),
-      responsible: existingResource?.responsible || undefined,
-      requiresApproval: payload.requiresApproval ?? true,
-      imageHint: payload.vehicleCategory.toLowerCase(),
-      nextAvailableAt: existingResource?.nextAvailableAt,
-      tags: [payload.vehicleCategory, normalizedBrand, normalizedModel].filter(Boolean),
-    };
-  };
-
-  const createVehicle = (payload: NewVehiclePayload): ActionResult => {
-    const validationError = validateVehiclePayload(payload);
-    if (validationError) {
-      return { success: false, message: validationError };
-    }
-
-    const resource = buildVehicleRecord(payload);
-
-    setResources((current) => [resource, ...current]);
-
-    return {
-      success: true,
-      message: `Veículo ${resource.code} cadastrado com sucesso.`,
-      resource,
-    };
-  };
-
-  const updateVehicle = (resourceId: string, payload: NewVehiclePayload): ActionResult => {
-    const existingResource = resources.find((item) => item.id === resourceId);
-
-    if (!existingResource) {
-      return { success: false, message: "Veículo não encontrado." };
-    }
-
-    const validationError = validateVehiclePayload(payload, resourceId);
-    if (validationError) {
-      return { success: false, message: validationError };
-    }
-
-    const updatedResource = buildVehicleRecord(payload, existingResource);
-
-    setResources((current) =>
-      current.map((item) => (item.id === resourceId ? updatedResource : item))
-    );
-
-    return {
-      success: true,
-      message: `Veículo ${updatedResource.code} atualizado com sucesso.`,
-      resource: updatedResource,
-    };
-  };
-
-  const validateUserPayload = (payload: NewUserPayload, userId?: string) => {
-    const requiredFields = [
-      payload.name,
-      payload.fullName,
-      payload.cpf,
-      payload.matricula,
-      payload.areaDepartamento,
-      payload.centroCusto,
-      payload.emailCorporativo,
-      payload.telefone,
-      payload.cnhNumero,
-      payload.cnhCategoria,
-      payload.cnhUfEmissao,
-    ];
-
-    if (requiredFields.some((field) => !field.trim())) {
-      return "Preencha todos os campos obrigatórios do usuário.";
-    }
-
-    if (
-      usersData.some(
-        (item) =>
-          item.id !== userId &&
-          item.matricula.toLowerCase() === payload.matricula.trim().toLowerCase()
-      )
-    ) {
-      return "Já existe um usuário com essa matrícula.";
-    }
-
-    if (
-      usersData.some(
-        (item) =>
-          item.id !== userId &&
-          item.emailCorporativo.toLowerCase() === payload.emailCorporativo.trim().toLowerCase()
-      )
-    ) {
-      return "Já existe um usuário com esse e-mail corporativo.";
-    }
-
-    if (
-      usersData.some((item) => item.id !== userId && item.cpf === payload.cpf.trim())
-    ) {
-      return "Já existe um usuário com esse CPF.";
-    }
-
-    if (payload.gestorId?.trim() && !findUserByReference(usersData, payload.gestorId)) {
-      return "Gestor não encontrado. Informe nome, e-mail, matrícula ou ID de um colaborador existente.";
-    }
-
-    return null;
-  };
-
-  const buildUserRecord = (payload: NewUserPayload, existingUser?: User): User => {
-    const resolvedId = existingUser?.id ?? `usr-${Date.now()}`;
-    const corporateEmail = payload.emailCorporativo.trim().toLowerCase();
-    const resolvedManagerId = findUserByReference(usersData, payload.gestorId)?.id;
-
-    return {
-      id: resolvedId,
-      userId: existingUser?.userId ?? resolvedId,
-      name: payload.name.trim(),
-      fullName: payload.fullName.trim(),
-      cpf: payload.cpf.trim(),
-      gestorVeiculo: payload.role !== "Solicitante",
-      matricula: payload.matricula.trim().toUpperCase(),
-      matriz: payload.matriz?.trim() || existingUser?.matriz || currentUser?.matriz || "Belo Horizonte",
-      role: payload.role,
-      area: payload.areaDepartamento.trim(),
-      areaDepartamento: payload.areaDepartamento.trim(),
-      centroCusto: payload.centroCusto.trim().toUpperCase(),
-      email: corporateEmail,
-      emailCorporativo: corporateEmail,
-      telefone: payload.telefone.trim(),
-      gestorId:
-        resolvedManagerId ||
-        existingUser?.gestorId ||
-        currentUser?.gestorId ||
-        currentUser?.id,
-      cnhNumero: payload.cnhNumero.trim().toUpperCase(),
-      cnhCategoria: payload.cnhCategoria.trim().toUpperCase(),
-      cnhUfEmissao: payload.cnhUfEmissao.trim().toUpperCase(),
-      cnhStatus: payload.cnhStatus,
-      cnhDataUltimaValidacao: existingUser?.cnhDataUltimaValidacao ?? new Date().toISOString(),
-      cnhAnexo: payload.cnhAnexo?.trim() || "",
-      termosPaytrack: existingUser?.termosPaytrack ?? true,
-      observacao: payload.observacao?.trim() || undefined,
-    };
-  };
-
-  const createUser = (payload: NewUserPayload): ActionResult => {
-    const validationError = validateUserPayload(payload);
-    if (validationError) {
-      return { success: false, message: validationError };
-    }
-
-    const user = buildUserRecord(payload);
-
-    setUsersData((current) => [user, ...current]);
-
-    return {
-      success: true,
-      message: `Usuário ${user.fullName} cadastrado com sucesso.`,
-      user,
-    };
-  };
-
-  const updateUser = (userId: string, payload: NewUserPayload): ActionResult => {
-    const existingUser = usersData.find((item) => item.id === userId);
-
-    if (!existingUser) {
-      return { success: false, message: "Usuário não encontrado." };
-    }
-
-    const validationError = validateUserPayload(payload, userId);
-    if (validationError) {
-      return { success: false, message: validationError };
-    }
-
-    const updatedUser = buildUserRecord(payload, existingUser);
-
-    setUsersData((current) =>
-      current.map((item) => (item.id === userId ? updatedUser : item))
-    );
-
-    return {
-      success: true,
-      message: `Usuário ${updatedUser.fullName} atualizado com sucesso.`,
-      user: updatedUser,
-    };
-  };
-
-  const createReservation = (payload: NewReservationPayload): ActionResult => {
-    if (
-      !payload.resourceId ||
-      !payload.startDate ||
-      !payload.endDate ||
-      !payload.purpose ||
-      !payload.base
-    ) {
-      return { success: false, message: "Preencha todos os campos obrigatórios." };
-    }
-
-    if (new Date(payload.endDate) < new Date(payload.startDate)) {
-      return { success: false, message: "A data final não pode ser menor que a data inicial." };
-    }
-
-    if (new Date(payload.startDate) < new Date()) {
-      return {
-        success: false,
-        message: "Não é possível criar reservas com data ou horário no passado.",
-      };
-    }
-
-    if (!isSameCalendarDay(payload.startDate, payload.endDate)) {
-      return {
-        success: false,
-        message: "A reserva deve começar e terminar no mesmo dia.",
-      };
-    }
-
-    const durationHours =
-      payload.durationHours ?? getDurationHours(payload.startDate, payload.endDate);
-
-    if (durationHours < 1 || durationHours > 4) {
-      return {
-        success: false,
-        message: "A reserva deve ter duração mínima de 1 hora e máxima de 4 horas.",
-      };
-    }
-
-    const resource = resources.find((item) => item.id === payload.resourceId);
-    if (!resource) {
-      return { success: false, message: "Recurso não encontrado." };
-    }
-
-    if (
-      resource.status === "Manutencao" &&
-      isResourceInMaintenanceOnDate(resource, new Date(payload.startDate))
-    ) {
-      return {
-        success: false,
-        message: "O veículo está em manutenção e não pode ser reservado neste período.",
-      };
-    }
-
-    const conflicts = getResourceConflicts(
-      reservations,
-      payload.resourceId,
-      payload.startDate,
-      payload.endDate
-    );
-
-    if (conflicts.length > 0) {
-      return {
-        success: false,
-        message: "Já existe uma reserva para o recurso no horário informado.",
-      };
-    }
-
-    const reservation: Reservation = {
-      id: `rsv-${Date.now()}`,
-      code: getNextReservationCode(reservations, payload.startDate),
-      resourceId: payload.resourceId,
-      userId: currentUserId,
-      title: `Reserva ${resource.name}`,
-      purpose: payload.purpose,
-      base: payload.base,
-      startDate: payload.startDate,
-      endDate: payload.endDate,
-      plannedDurationHours: durationHours,
-      status: "Reservado",
-      notes: payload.notes,
-      history: [
-        {
-          id: `hist-${Date.now()}`,
-          label: "Reserva reservada",
-          timestamp: new Date().toISOString(),
-          actor: currentUserName,
-          note: payload.notes,
-        },
-      ],
-    };
-
-    setReservations((current) => [reservation, ...current]);
-
-    return {
-      success: true,
-      message: `Reserva criada para ${durationHours}h com status Reservado.`,
-      reservation,
-    };
-  };
-
-  const cancelReservation = (reservationId: string): ActionResult => {
-    const reservation = reservations.find((item) => item.id === reservationId);
-
-    if (!reservation) {
-      return { success: false, message: "Reserva não encontrada." };
-    }
-
-    if (reservation.status !== "Reservado") {
-      return {
-        success: false,
-        message: "Só é possível cancelar reservas ainda não utilizadas.",
-      };
-    }
-
-    if (!isScheduledReservationActive(reservation)) {
-      return {
-        success: false,
-        message: "A janela da reserva já foi encerrada e não permite cancelamento.",
-      };
-    }
-
-    const updatedReservation: Reservation = {
-      ...reservation,
-      status: "Cancelada",
-      history: appendHistoryItem(reservation, "Reserva cancelada"),
-    };
-
-    setReservations((current) =>
-      current.map((item) => (item.id === reservationId ? updatedReservation : item))
-    );
-
-    return {
-      success: true,
-      message: "Reserva cancelada com sucesso.",
-      reservation: updatedReservation,
-    };
-  };
-
-  const validateOperationPayload = (
-    mode: "checkin" | "checkout",
-    reservation: Reservation,
-    payload: ReservationOperationPayload
-  ) => {
-    if (!payload.mileage.trim()) {
-      return mode === "checkin"
-        ? "Informe a quilometragem de saída."
-        : "Informe a quilometragem de retorno.";
-    }
-
-    if (!payload.fuelLevel) {
-      return "Informe o nível de combustível.";
-    }
-
-    if (!payload.counterpartyName.trim()) {
-      return mode === "checkin"
-        ? "Informe quem entregou o veículo."
-        : "Informe quem recebeu o veículo.";
-    }
-
-    if (!payload.confirmationChecked) {
-      return "Confirme a vistoria para continuar.";
-    }
-
-    if (!hasSignature(payload.signature)) {
-      return "A assinatura digital é obrigatória.";
-    }
-
-    if (payload.damageIdentified) {
-      if (!payload.damageDescription?.trim()) {
-        return "Descreva a avaria ou ocorrência identificada.";
+    const unsubscribe = subscribeToRemoteAppState(() => {
+      if (realtimeRefreshTimeoutRef.current) {
+        clearTimeout(realtimeRefreshTimeoutRef.current);
       }
 
-      if (payload.damagePhotos.length === 0) {
-        return "Adicione ao menos uma foto da avaria.";
+      realtimeRefreshTimeoutRef.current = setTimeout(() => {
+        void refreshRemoteState({ silent: true });
+      }, 350);
+    });
+
+    return () => {
+      if (realtimeRefreshTimeoutRef.current) {
+        clearTimeout(realtimeRefreshTimeoutRef.current);
       }
+      unsubscribe();
+    };
+  }, [backendConfig.isConfigured, refreshRemoteState]);
+
+  useEffect(() => {
+    if (!backendConfig.isConfigured) {
+      return;
     }
 
-    if (mode === "checkout") {
-      const startMileage = parseMileageValue(reservation.startMileage);
-      const endMileage = parseMileageValue(payload.mileage);
-
-      if (startMileage !== null && endMileage !== null && endMileage < startMileage) {
-        return "A quilometragem final não pode ser menor que a quilometragem de saída.";
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        void refreshRemoteState({ silent: true });
       }
-    }
+    });
 
-    return null;
-  };
-
-  const buildInspection = (
-    mode: "checkin" | "checkout",
-    payload: ReservationOperationPayload
-  ): ReservationInspection => ({
-    mode,
-    inspectedAt: new Date().toISOString(),
-    inspectedBy: currentUserName,
-    counterpartyName: payload.counterpartyName,
-    mileage: payload.mileage,
-    fuelLevel: payload.fuelLevel,
-    checklist: { ...payload.checklist, damageReported: payload.damageIdentified },
-    notes: payload.notes,
-    requiredPhotos: payload.requiredPhotos,
-    additionalPhotos: payload.additionalPhotos,
-    damagePhotos: payload.damagePhotos,
-    damageIdentified: payload.damageIdentified,
-    damageDescription: payload.damageDescription,
-    confirmationChecked: payload.confirmationChecked,
-    signature: payload.signature,
-  });
-
-  const checkInReservation = (
-    reservationId: string,
-    payload: ReservationOperationPayload
-  ): ActionResult => {
-    const reservation = reservations.find((item) => item.id === reservationId);
-
-    if (!reservation) {
-      return { success: false, message: "Reserva não encontrada." };
-    }
-
-    if (reservation.status !== "Reservado") {
-      return {
-        success: false,
-        message: "Apenas reservas reservadas podem iniciar check-in.",
-      };
-    }
-
-    if (!isScheduledReservationActive(reservation)) {
-      return {
-        success: false,
-        message: "A janela da reserva já foi encerrada e não permite check-in.",
-      };
-    }
-
-    const validationError = validateOperationPayload("checkin", reservation, payload);
-    if (validationError) {
-      return { success: false, message: validationError };
-    }
-
-    const inspection = buildInspection("checkin", payload);
-    const updatedReservation: Reservation = {
-      ...reservation,
-      status: "Em uso",
-      checkInAt: inspection.inspectedAt,
-      checkInNotes: payload.notes,
-      startMileage: payload.mileage,
-      checkInChecklist: inspection.checklist,
-      checkInFuelLevel: payload.fuelLevel,
-      checkInData: inspection,
-      history: appendHistoryItem(
-        reservation,
-        "Vistoria de saída concluída",
-        payload.notes || `Km ${payload.mileage} | Combustível ${payload.fuelLevel}`
-      ),
+    return () => {
+      subscription.remove();
     };
+  }, [backendConfig.isConfigured, refreshRemoteState]);
 
-    setReservations((current) =>
-      current.map((item) => (item.id === reservationId ? updatedReservation : item))
-    );
-
-    return {
-      success: true,
-      message: "Check-in realizado. A reserva agora está em uso.",
-      reservation: updatedReservation,
-    };
-  };
-
-  const checkOutReservation = (
-    reservationId: string,
-    payload: ReservationOperationPayload
-  ): ActionResult => {
-    const reservation = reservations.find((item) => item.id === reservationId);
-
-    if (!reservation) {
-      return { success: false, message: "Reserva não encontrada." };
-    }
-
-    if (reservation.status !== "Em uso") {
-      return {
-        success: false,
-        message: "Apenas reservas em uso podem finalizar check-out.",
-      };
-    }
-
-    const validationError = validateOperationPayload("checkout", reservation, payload);
-    if (validationError) {
-      return { success: false, message: validationError };
-    }
-
-    const inspection = buildInspection("checkout", payload);
-    const updatedReservation: Reservation = {
-      ...reservation,
-      status: "Concluida",
-      checkOutAt: inspection.inspectedAt,
-      checkOutNotes: payload.notes,
-      endMileage: payload.mileage,
-      checkOutChecklist: inspection.checklist,
-      checkOutFuelLevel: payload.fuelLevel,
-      checkOutData: inspection,
-      history: appendHistoryItem(
-        reservation,
-        "Check-in de devolução concluído",
-        payload.notes || `Km ${payload.mileage} | Combustível ${payload.fuelLevel}`
-      ),
-    };
-
-    setReservations((current) =>
-      current.map((item) => (item.id === reservationId ? updatedReservation : item))
-    );
-
-    return {
-      success: true,
-      message: "Check-out realizado. Reserva concluída e veículo disponível.",
-      reservation: updatedReservation,
-    };
-  };
-
-  const exportReservationsReport = async (): Promise<ActionResult> => {
-    try {
-      const filename = `reservas-sigma-${new Date().toISOString().slice(0, 10)}.csv`;
-      const csv = buildReservationsCsv(reservations, resources, usersData);
-      const result = await downloadCsvForExcel(filename, csv);
-
-      return {
-        success: true,
-        message: result.message,
-        fileUri: result.fileUri,
-      };
-    } catch {
-      return {
-        success: false,
-        message: "Não foi possível gerar o arquivo de reservas.",
-      };
-    }
-  };
-
-  const value = useMemo(
+  const buildSnapshot = useCallback(
     () => ({
+      users,
       resources,
       reservations,
-      users: usersData,
       currentUser,
       currentUserId,
       currentUserName,
+    }),
+    [currentUser, currentUserId, currentUserName, reservations, resources, users]
+  );
+
+  const runMutation = useCallback(
+    async (
+      action: (
+        snapshot: ReturnType<typeof buildSnapshot>
+      ) => Promise<ActionResult>
+    ): Promise<ActionResult> => {
+      if (!backendConfig.isConfigured) {
+        return {
+          success: false,
+          message:
+            "Backend nao configurado. Preencha as variaveis de ambiente antes de executar operacoes.",
+        };
+      }
+
+      setIsMutating(true);
+
+      try {
+        const result = await action(buildSnapshot());
+
+        if (result.success) {
+          await mergeActionResultIntoState(result);
+          void refreshRemoteState({ silent: true });
+        }
+
+        return result;
+      } catch (error) {
+        return {
+          success: false,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Nao foi possivel concluir a operacao no backend.",
+        };
+      } finally {
+        setIsMutating(false);
+      }
+    },
+    [backendConfig.isConfigured, buildSnapshot, mergeActionResultIntoState, refreshRemoteState]
+  );
+
+  const getResourceStatus = useCallback(
+    (resourceId: string, referenceDate = new Date()) => {
+      const resource = resources.find((item) => item.id === resourceId);
+      if (!resource) {
+        return "Disponivel" as const;
+      }
+
+      return getCurrentResourceStatus(resource, reservations, referenceDate);
+    },
+    [reservations, resources]
+  );
+
+  const getReservationsForResource = useCallback(
+    (resourceId: string) => getResourceReservations(reservations, resourceId),
+    [reservations]
+  );
+
+  const getReservationsForDay = useCallback(
+    (resourceId: string, date: Date) =>
+      getReservationsForResourceDay(reservations, resourceId, date),
+    [reservations]
+  );
+
+  const getAvailabilityForDate = useCallback(
+    (resourceId: string, date: Date) => {
+      const resource = resources.find((item) => item.id === resourceId);
+
+      if (!resource) {
+        return { state: "disponivel" as const, reservations: [], isAvailable: false };
+      }
+
+      return getResourceAvailabilityForDate(resource, reservations, date);
+    },
+    [reservations, resources]
+  );
+
+  const getActionableReservations = useCallback(
+    () => getActionableReservationsForUser(reservations, currentUserId),
+    [currentUserId, reservations]
+  );
+
+  const getSummary = useCallback(
+    (referenceDate = new Date()) => getFleetSummary(resources, reservations, referenceDate),
+    [reservations, resources]
+  );
+
+  const createVehicle = useCallback(
+    (payload: NewVehiclePayload) => runMutation((snapshot) => createVehicleUseCase(payload, snapshot)),
+    [runMutation]
+  );
+
+  const updateVehicle = useCallback(
+    (resourceId: string, payload: NewVehiclePayload) =>
+      runMutation((snapshot) => updateVehicleUseCase(resourceId, payload, snapshot)),
+    [runMutation]
+  );
+
+  const createUser = useCallback(
+    (payload: NewUserPayload) => runMutation((snapshot) => createUserUseCase(payload, snapshot)),
+    [runMutation]
+  );
+
+  const updateUser = useCallback(
+    (userId: string, payload: NewUserPayload) =>
+      runMutation((snapshot) => updateUserUseCase(userId, payload, snapshot)),
+    [runMutation]
+  );
+
+  const createReservation = useCallback(
+    (payload: NewReservationPayload) =>
+      runMutation((snapshot) => createReservationUseCase(payload, snapshot)),
+    [runMutation]
+  );
+
+  const cancelReservation = useCallback(
+    (reservationId: string) =>
+      runMutation((snapshot) => cancelReservationUseCase(reservationId, snapshot)),
+    [runMutation]
+  );
+
+  const checkInReservation = useCallback(
+    (reservationId: string, payload: ReservationOperationPayload) =>
+      runMutation((snapshot) => checkInReservationUseCase(reservationId, payload, snapshot)),
+    [runMutation]
+  );
+
+  const checkOutReservation = useCallback(
+    (reservationId: string, payload: ReservationOperationPayload) =>
+      runMutation((snapshot) => checkOutReservationUseCase(reservationId, payload, snapshot)),
+    [runMutation]
+  );
+
+  const toggleResourceMaintenance = useCallback(
+    (resourceId: string) =>
+      runMutation((snapshot) => toggleResourceMaintenanceUseCase(resourceId, snapshot)),
+    [runMutation]
+  );
+
+  const exportReservationsReport = useCallback(
+    () => exportReservationsReportUseCase(buildSnapshot()),
+    [buildSnapshot]
+  );
+
+  const value = useMemo(
+    () => ({
+      users,
+      resources,
+      reservations,
+      currentUser,
+      currentUserId,
+      currentUserName,
+      isBootstrapping,
+      isRefreshing,
+      isMutating,
+      isBackendConfigured: backendConfig.isConfigured,
+      isUsingCachedData,
+      syncError,
+      lastSyncedAt,
+      refreshRemoteState: () => refreshRemoteState(),
       toggleResourceMaintenance,
       createVehicle,
       createUser,
@@ -888,8 +516,79 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       getActionableReservations,
       getSummary,
     }),
-    [currentUser, currentUserName, reservations, resources, usersData]
+    [
+      backendConfig.isConfigured,
+      cancelReservation,
+      checkInReservation,
+      checkOutReservation,
+      createReservation,
+      createUser,
+      createVehicle,
+      currentUser,
+      currentUserId,
+      currentUserName,
+      exportReservationsReport,
+      getActionableReservations,
+      getAvailabilityForDate,
+      getReservationsForDay,
+      getReservationsForResource,
+      getResourceStatus,
+      getSummary,
+      isBootstrapping,
+      isMutating,
+      isRefreshing,
+      isUsingCachedData,
+      lastSyncedAt,
+      refreshRemoteState,
+      reservations,
+      resources,
+      syncError,
+      toggleResourceMaintenance,
+      updateUser,
+      updateVehicle,
+      users,
+    ]
   );
+
+  if (isBootstrapping && !hasMinimumData) {
+    return (
+      <BlockingStateScreen
+        title="Sincronizando dados"
+        description="Carregando usuarios, veiculos e reservas a partir do backend persistente."
+      />
+    );
+  }
+
+  if (!backendConfig.isConfigured && !hasMinimumData) {
+    return (
+      <BlockingStateScreen
+        title="Backend nao configurado"
+        description="Defina EXPO_PUBLIC_SUPABASE_URL e EXPO_PUBLIC_SUPABASE_ANON_KEY para usar o app com fonte unica de verdade remota."
+      />
+    );
+  }
+
+  if (syncError && !hasMinimumData) {
+    return (
+      <BlockingStateScreen
+        title="Falha de sincronizacao"
+        description={syncError}
+        actionLabel="Tentar novamente"
+        onPress={() => void refreshRemoteState()}
+      />
+    );
+  }
+
+  if (!isBootstrapping && users.length === 0) {
+    return (
+      <BlockingStateScreen
+        title="Backend sem usuarios"
+        description="O backend foi configurado, mas ainda nao existe nenhum usuario persistido. Execute a seed inicial antes de usar o app."
+        actionLabel="Atualizar"
+        onPress={() => void refreshRemoteState()}
+      />
+    );
+  }
 
   return (
     <ReservationStoreContext.Provider value={value}>
@@ -897,6 +596,77 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
     </ReservationStoreContext.Provider>
   );
 }
+
+function BlockingStateScreen({
+  title,
+  description,
+  actionLabel,
+  onPress,
+}: {
+  title: string;
+  description: string;
+  actionLabel?: string;
+  onPress?: () => void;
+}) {
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.stateShell}>
+        <View style={styles.stateCard}>
+          <Text style={styles.stateTitle}>{title}</Text>
+          <Text style={styles.stateDescription}>{description}</Text>
+
+          {actionLabel && onPress ? (
+            <Pressable onPress={onPress} style={styles.stateButton}>
+              <Text style={styles.stateButtonLabel}>{actionLabel}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  stateShell: {
+    flex: 1,
+    justifyContent: "center",
+    padding: spacing.lg,
+  },
+  stateCard: {
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  stateTitle: {
+    color: colors.text,
+    fontSize: typography.section,
+    fontWeight: "700",
+  },
+  stateDescription: {
+    color: colors.textSecondary,
+    fontSize: typography.body,
+    lineHeight: 22,
+  },
+  stateButton: {
+    minHeight: 48,
+    borderRadius: radius.md,
+    backgroundColor: colors.primaryDark,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stateButtonLabel: {
+    color: colors.white,
+    fontSize: typography.body,
+    fontWeight: "700",
+  },
+});
 
 export function useReservationStore() {
   const context = useContext(ReservationStoreContext);
@@ -907,9 +677,3 @@ export function useReservationStore() {
 
   return context;
 }
-
-
-
-
-
-

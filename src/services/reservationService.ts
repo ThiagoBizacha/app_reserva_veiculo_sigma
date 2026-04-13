@@ -1,0 +1,806 @@
+import { buildReservationsCsv, downloadCsvForExcel } from "@/utils/export";
+import {
+  hasSignature,
+  parseMileageValue,
+} from "@/utils/operation";
+import {
+  getNextReservationCode,
+} from "@/utils/reservationCode";
+import {
+  getResourceConflicts,
+  isResourceInMaintenanceOnDate,
+  isScheduledReservationActive,
+} from "@/utils/reservations";
+import { findUserByReference } from "@/utils/users";
+import {
+  getDurationHours,
+  isSameCalendarDay,
+} from "@/utils/date";
+import type {
+  NewReservationPayload,
+  NewUserPayload,
+  NewVehiclePayload,
+  Reservation,
+  ReservationInspection,
+  ReservationOperationPayload,
+  Resource,
+  User,
+} from "@/types";
+import { appendAuditLog } from "@/backend/repositories/auditRepository";
+import type { Json } from "@/backend/database.types";
+import { clearMaintenance, activateMaintenance } from "@/backend/repositories/maintenanceRepository";
+import { upsertReservation } from "@/backend/repositories/reservationsRepository";
+import { upsertResource } from "@/backend/repositories/resourcesRepository";
+import { upsertUser } from "@/backend/repositories/usersRepository";
+import { generateEntityId } from "@/backend/utils";
+
+export interface ActionResult {
+  success: boolean;
+  message: string;
+  reservation?: Reservation;
+  resource?: Resource;
+  user?: User;
+  fileUri?: string;
+}
+
+interface ActorContext {
+  currentUser: User;
+  currentUserId: string;
+  currentUserName: string;
+}
+
+interface ServiceSnapshot extends ActorContext {
+  reservations: Reservation[];
+  resources: Resource[];
+  users: User[];
+}
+
+function buildAuditEntry(
+  entityType: string,
+  entityId: string,
+  action: string,
+  actor: ActorContext,
+  details: Record<string, unknown>
+) {
+  return {
+    id: generateEntityId("aud"),
+    entity_type: entityType,
+    entity_id: entityId,
+    action,
+    actor_user_id: actor.currentUserId,
+    actor_name: actor.currentUserName,
+    origin: "mobile-app",
+    occurred_at: new Date().toISOString(),
+    details: details as Json,
+  };
+}
+
+function buildHistoryItem(label: string, actorName: string, note?: string) {
+  return {
+    id: generateEntityId("hist"),
+    label,
+    timestamp: new Date().toISOString(),
+    actor: actorName,
+    note,
+  };
+}
+
+function validateVehiclePayload(
+  payload: NewVehiclePayload,
+  resources: Resource[],
+  resourceId?: string
+) {
+  const requiredFields = [
+    payload.name,
+    payload.code,
+    payload.plate,
+    payload.brand,
+    payload.model,
+    payload.year,
+    payload.currentMileage,
+    payload.description,
+  ];
+
+  if (requiredFields.some((field) => !field.trim())) {
+    return "Preencha todos os campos obrigatorios do veiculo.";
+  }
+
+  if (
+    resources.some(
+      (item) =>
+        item.id !== resourceId && item.code.toLowerCase() === payload.code.trim().toLowerCase()
+    )
+  ) {
+    return "Ja existe um veiculo com esse codigo.";
+  }
+
+  if (
+    resources.some(
+      (item) =>
+        item.id !== resourceId &&
+        item.plate?.toLowerCase() === payload.plate.trim().toLowerCase()
+    )
+  ) {
+    return "Ja existe um veiculo com essa placa.";
+  }
+
+  return null;
+}
+
+function buildVehicleRecord(
+  payload: NewVehiclePayload,
+  resources: Resource[],
+  existingResource?: Resource
+): Resource {
+  const vehicleCount = resources.filter((item) => item.category === "Veiculo").length + 1;
+  const normalizedName = payload.name.trim();
+  const normalizedCode = payload.code.trim().toUpperCase();
+  const normalizedPlate = payload.plate.trim().toUpperCase();
+  const normalizedBrand = payload.brand.trim();
+  const normalizedModel = payload.model.trim();
+  const normalizedMileage = payload.currentMileage.trim();
+
+  return {
+    id: existingResource?.id ?? generateEntityId("res"),
+    vehicleId: existingResource?.vehicleId ?? `VEH-${String(vehicleCount).padStart(3, "0")}`,
+    name: normalizedName,
+    code: normalizedCode,
+    category: existingResource?.category ?? "Veiculo",
+    status: existingResource?.status ?? "Disponivel",
+    plate: normalizedPlate,
+    model: normalizedModel,
+    brand: normalizedBrand,
+    year: payload.year.trim(),
+    rentalCompany: payload.rentalCompany?.trim() || "Cadastro interno",
+    vehicleCategory: payload.vehicleCategory,
+    currentMileage: normalizedMileage,
+    lastInspectionDate: existingResource?.lastInspectionDate ?? new Date().toISOString(),
+    vehicleDocumentAttachment: payload.vehicleDocumentAttachment?.trim() || "",
+    vehiclePhotoAttachments: existingResource?.vehiclePhotoAttachments ?? [],
+    lastMaintenanceDate: existingResource?.lastMaintenanceDate ?? new Date().toISOString(),
+    nextMaintenanceDate: payload.nextMaintenanceDate?.trim() || undefined,
+    lastMaintenanceMileage: existingResource?.lastMaintenanceMileage ?? normalizedMileage,
+    nextMaintenanceMileage: payload.nextMaintenanceMileage?.trim() || undefined,
+    observation: payload.observation?.trim() || undefined,
+    location: payload.location?.trim() || existingResource?.location || "Base interna",
+    capacity: existingResource?.capacity ?? "5 lugares",
+    description: payload.description.trim(),
+    responsible: existingResource?.responsible || undefined,
+    requiresApproval: payload.requiresApproval ?? true,
+    imageHint: payload.vehicleCategory.toLowerCase(),
+    nextAvailableAt: existingResource?.nextAvailableAt,
+    tags: [payload.vehicleCategory, normalizedBrand, normalizedModel].filter(Boolean),
+  };
+}
+
+function validateUserPayload(payload: NewUserPayload, users: User[], userId?: string) {
+  const requiredFields = [
+    payload.name,
+    payload.fullName,
+    payload.cpf,
+    payload.matricula,
+    payload.areaDepartamento,
+    payload.centroCusto,
+    payload.emailCorporativo,
+    payload.telefone,
+    payload.cnhNumero,
+    payload.cnhCategoria,
+    payload.cnhUfEmissao,
+  ];
+
+  if (requiredFields.some((field) => !field.trim())) {
+    return "Preencha todos os campos obrigatorios do usuario.";
+  }
+
+  if (
+    users.some(
+      (item) =>
+        item.id !== userId &&
+        item.matricula.toLowerCase() === payload.matricula.trim().toLowerCase()
+    )
+  ) {
+    return "Ja existe um usuario com essa matricula.";
+  }
+
+  if (
+    users.some(
+      (item) =>
+        item.id !== userId &&
+        item.emailCorporativo.toLowerCase() === payload.emailCorporativo.trim().toLowerCase()
+    )
+  ) {
+    return "Ja existe um usuario com esse e-mail corporativo.";
+  }
+
+  if (users.some((item) => item.id !== userId && item.cpf === payload.cpf.trim())) {
+    return "Ja existe um usuario com esse CPF.";
+  }
+
+  if (payload.gestorId?.trim() && !findUserByReference(users, payload.gestorId)) {
+    return "Gestor nao encontrado. Informe nome, e-mail, matricula ou ID de um colaborador existente.";
+  }
+
+  return null;
+}
+
+function buildUserRecord(
+  payload: NewUserPayload,
+  users: User[],
+  actor: ActorContext,
+  existingUser?: User
+): User {
+  const resolvedId = existingUser?.id ?? generateEntityId("usr");
+  const corporateEmail = payload.emailCorporativo.trim().toLowerCase();
+  const resolvedManagerId = findUserByReference(users, payload.gestorId)?.id;
+
+  return {
+    id: resolvedId,
+    userId: existingUser?.userId ?? resolvedId,
+    name: payload.name.trim(),
+    fullName: payload.fullName.trim(),
+    cpf: payload.cpf.trim(),
+    gestorVeiculo: payload.role !== "Solicitante",
+    matricula: payload.matricula.trim().toUpperCase(),
+    matriz: payload.matriz?.trim() || existingUser?.matriz || actor.currentUser.matriz || "Belo Horizonte",
+    role: payload.role,
+    area: payload.areaDepartamento.trim(),
+    areaDepartamento: payload.areaDepartamento.trim(),
+    centroCusto: payload.centroCusto.trim().toUpperCase(),
+    email: corporateEmail,
+    emailCorporativo: corporateEmail,
+    telefone: payload.telefone.trim(),
+    gestorId:
+      resolvedManagerId ||
+      existingUser?.gestorId ||
+      actor.currentUser.gestorId ||
+      actor.currentUser.id,
+    cnhNumero: payload.cnhNumero.trim().toUpperCase(),
+    cnhCategoria: payload.cnhCategoria.trim().toUpperCase(),
+    cnhUfEmissao: payload.cnhUfEmissao.trim().toUpperCase(),
+    cnhStatus: payload.cnhStatus,
+    cnhDataUltimaValidacao: existingUser?.cnhDataUltimaValidacao ?? new Date().toISOString(),
+    cnhAnexo: payload.cnhAnexo?.trim() || "",
+    termosPaytrack: existingUser?.termosPaytrack ?? true,
+    observacao: payload.observacao?.trim() || undefined,
+  };
+}
+
+function validateReservationPayload(
+  payload: NewReservationPayload,
+  resources: Resource[],
+  reservations: Reservation[]
+) {
+  if (
+    !payload.resourceId ||
+    !payload.startDate ||
+    !payload.endDate ||
+    !payload.purpose ||
+    !payload.base
+  ) {
+    return "Preencha todos os campos obrigatorios.";
+  }
+
+  if (new Date(payload.endDate) < new Date(payload.startDate)) {
+    return "A data final nao pode ser menor que a data inicial.";
+  }
+
+  if (new Date(payload.startDate) < new Date()) {
+    return "Nao e possivel criar reservas com data ou horario no passado.";
+  }
+
+  if (!isSameCalendarDay(payload.startDate, payload.endDate)) {
+    return "A reserva deve comecar e terminar no mesmo dia.";
+  }
+
+  const durationHours = payload.durationHours ?? getDurationHours(payload.startDate, payload.endDate);
+  if (durationHours < 1 || durationHours > 4) {
+    return "A reserva deve ter duracao minima de 1 hora e maxima de 4 horas.";
+  }
+
+  const resource = resources.find((item) => item.id === payload.resourceId);
+  if (!resource) {
+    return "Recurso nao encontrado.";
+  }
+
+  if (
+    resource.status === "Manutencao" &&
+    isResourceInMaintenanceOnDate(resource, new Date(payload.startDate))
+  ) {
+    return "O veiculo esta em manutencao e nao pode ser reservado neste periodo.";
+  }
+
+  const conflicts = getResourceConflicts(
+    reservations,
+    payload.resourceId,
+    payload.startDate,
+    payload.endDate
+  );
+
+  if (conflicts.length > 0) {
+    return "Ja existe uma reserva para o recurso no horario informado.";
+  }
+
+  return null;
+}
+
+function validateOperationPayload(
+  mode: "checkin" | "checkout",
+  reservation: Reservation,
+  payload: ReservationOperationPayload
+) {
+  if (!payload.mileage.trim()) {
+    return mode === "checkin"
+      ? "Informe a quilometragem de saida."
+      : "Informe a quilometragem de retorno.";
+  }
+
+  if (!payload.fuelLevel) {
+    return "Informe o nivel de combustivel.";
+  }
+
+  if (!payload.counterpartyName.trim()) {
+    return mode === "checkin"
+      ? "Informe quem entregou o veiculo."
+      : "Informe quem recebeu o veiculo.";
+  }
+
+  if (!payload.confirmationChecked) {
+    return "Confirme a vistoria para continuar.";
+  }
+
+  if (!hasSignature(payload.signature)) {
+    return "A assinatura digital e obrigatoria.";
+  }
+
+  if (payload.damageIdentified) {
+    if (!payload.damageDescription?.trim()) {
+      return "Descreva a avaria ou ocorrencia identificada.";
+    }
+
+    if (payload.damagePhotos.length === 0) {
+      return "Adicione ao menos uma foto da avaria.";
+    }
+  }
+
+  if (mode === "checkout") {
+    const startMileage = parseMileageValue(reservation.startMileage);
+    const endMileage = parseMileageValue(payload.mileage);
+
+    if (startMileage !== null && endMileage !== null && endMileage < startMileage) {
+      return "A quilometragem final nao pode ser menor que a quilometragem de saida.";
+    }
+  }
+
+  return null;
+}
+
+function buildInspection(
+  mode: "checkin" | "checkout",
+  payload: ReservationOperationPayload,
+  actorName: string
+): ReservationInspection {
+  return {
+    mode,
+    inspectedAt: new Date().toISOString(),
+    inspectedBy: actorName,
+    counterpartyName: payload.counterpartyName,
+    mileage: payload.mileage,
+    fuelLevel: payload.fuelLevel,
+    checklist: { ...payload.checklist, damageReported: payload.damageIdentified },
+    notes: payload.notes,
+    requiredPhotos: payload.requiredPhotos,
+    additionalPhotos: payload.additionalPhotos,
+    damagePhotos: payload.damagePhotos,
+    damageIdentified: payload.damageIdentified,
+    damageDescription: payload.damageDescription,
+    confirmationChecked: payload.confirmationChecked,
+    signature: payload.signature,
+  };
+}
+
+export async function createVehicleUseCase(
+  payload: NewVehiclePayload,
+  snapshot: ServiceSnapshot
+): Promise<ActionResult> {
+  const validationError = validateVehiclePayload(payload, snapshot.resources);
+  if (validationError) {
+    return { success: false, message: validationError };
+  }
+
+  const resource = buildVehicleRecord(payload, snapshot.resources);
+  await upsertResource(resource);
+  await appendAuditLog(
+    buildAuditEntry("resource", resource.id, "resource.created", snapshot, {
+      code: resource.code,
+      plate: resource.plate,
+    })
+  );
+
+  return {
+    success: true,
+    message: `Veiculo ${resource.code} cadastrado com sucesso.`,
+    resource,
+  };
+}
+
+export async function updateVehicleUseCase(
+  resourceId: string,
+  payload: NewVehiclePayload,
+  snapshot: ServiceSnapshot
+): Promise<ActionResult> {
+  const existingResource = snapshot.resources.find((item) => item.id === resourceId);
+
+  if (!existingResource) {
+    return { success: false, message: "Veiculo nao encontrado." };
+  }
+
+  const validationError = validateVehiclePayload(payload, snapshot.resources, resourceId);
+  if (validationError) {
+    return { success: false, message: validationError };
+  }
+
+  const resource = buildVehicleRecord(payload, snapshot.resources, existingResource);
+  await upsertResource(resource);
+  await appendAuditLog(
+    buildAuditEntry("resource", resource.id, "resource.updated", snapshot, {
+      code: resource.code,
+      plate: resource.plate,
+    })
+  );
+
+  return {
+    success: true,
+    message: `Veiculo ${resource.code} atualizado com sucesso.`,
+    resource,
+  };
+}
+
+export async function createUserUseCase(
+  payload: NewUserPayload,
+  snapshot: ServiceSnapshot
+): Promise<ActionResult> {
+  const validationError = validateUserPayload(payload, snapshot.users);
+  if (validationError) {
+    return { success: false, message: validationError };
+  }
+
+  const user = buildUserRecord(payload, snapshot.users, snapshot);
+  await upsertUser(user);
+  await appendAuditLog(
+    buildAuditEntry("user", user.id, "user.created", snapshot, {
+      role: user.role,
+      matricula: user.matricula,
+    })
+  );
+
+  return {
+    success: true,
+    message: `Usuario ${user.fullName} cadastrado com sucesso.`,
+    user,
+  };
+}
+
+export async function updateUserUseCase(
+  userId: string,
+  payload: NewUserPayload,
+  snapshot: ServiceSnapshot
+): Promise<ActionResult> {
+  const existingUser = snapshot.users.find((item) => item.id === userId);
+
+  if (!existingUser) {
+    return { success: false, message: "Usuario nao encontrado." };
+  }
+
+  const validationError = validateUserPayload(payload, snapshot.users, userId);
+  if (validationError) {
+    return { success: false, message: validationError };
+  }
+
+  const user = buildUserRecord(payload, snapshot.users, snapshot, existingUser);
+  await upsertUser(user);
+  await appendAuditLog(
+    buildAuditEntry("user", user.id, "user.updated", snapshot, {
+      role: user.role,
+      matricula: user.matricula,
+    })
+  );
+
+  return {
+    success: true,
+    message: `Usuario ${user.fullName} atualizado com sucesso.`,
+    user,
+  };
+}
+
+export async function createReservationUseCase(
+  payload: NewReservationPayload,
+  snapshot: ServiceSnapshot
+): Promise<ActionResult> {
+  const validationError = validateReservationPayload(payload, snapshot.resources, snapshot.reservations);
+  if (validationError) {
+    return { success: false, message: validationError };
+  }
+
+  const resource = snapshot.resources.find((item) => item.id === payload.resourceId);
+  if (!resource) {
+    return { success: false, message: "Recurso nao encontrado." };
+  }
+
+  const durationHours =
+    payload.durationHours ?? getDurationHours(payload.startDate, payload.endDate);
+
+  const historyItem = buildHistoryItem(
+    "Reserva reservada",
+    snapshot.currentUserName,
+    payload.notes
+  );
+
+  const reservation: Reservation = {
+    id: generateEntityId("rsv"),
+    code: getNextReservationCode(snapshot.reservations, payload.startDate),
+    resourceId: payload.resourceId,
+    userId: snapshot.currentUserId,
+    title: `Reserva ${resource.name}`,
+    purpose: payload.purpose,
+    base: payload.base,
+    startDate: payload.startDate,
+    endDate: payload.endDate,
+    plannedDurationHours: durationHours,
+    status: "Reservado",
+    notes: payload.notes,
+    history: [historyItem],
+  };
+
+  await upsertReservation(reservation, historyItem);
+  await appendAuditLog(
+    buildAuditEntry("reservation", reservation.id, "reservation.created", snapshot, {
+      code: reservation.code,
+      resourceId: reservation.resourceId,
+      userId: reservation.userId,
+      status: reservation.status,
+    })
+  );
+
+  return {
+    success: true,
+    message: `Reserva criada para ${durationHours}h com status Reservado.`,
+    reservation,
+  };
+}
+
+export async function cancelReservationUseCase(
+  reservationId: string,
+  snapshot: ServiceSnapshot
+): Promise<ActionResult> {
+  const reservation = snapshot.reservations.find((item) => item.id === reservationId);
+
+  if (!reservation) {
+    return { success: false, message: "Reserva nao encontrada." };
+  }
+
+  if (reservation.status !== "Reservado") {
+    return {
+      success: false,
+      message: "So e possivel cancelar reservas ainda nao utilizadas.",
+    };
+  }
+
+  if (!isScheduledReservationActive(reservation)) {
+    return {
+      success: false,
+      message: "A janela da reserva ja foi encerrada e nao permite cancelamento.",
+    };
+  }
+
+  const historyItem = buildHistoryItem("Reserva cancelada", snapshot.currentUserName);
+  const updatedReservation: Reservation = {
+    ...reservation,
+    status: "Cancelada",
+    history: [historyItem, ...reservation.history],
+  };
+
+  await upsertReservation(updatedReservation, historyItem);
+  await appendAuditLog(
+    buildAuditEntry("reservation", updatedReservation.id, "reservation.cancelled", snapshot, {
+      code: updatedReservation.code,
+      status: updatedReservation.status,
+    })
+  );
+
+  return {
+    success: true,
+    message: "Reserva cancelada com sucesso.",
+    reservation: updatedReservation,
+  };
+}
+
+export async function checkInReservationUseCase(
+  reservationId: string,
+  payload: ReservationOperationPayload,
+  snapshot: ServiceSnapshot
+): Promise<ActionResult> {
+  const reservation = snapshot.reservations.find((item) => item.id === reservationId);
+
+  if (!reservation) {
+    return { success: false, message: "Reserva nao encontrada." };
+  }
+
+  if (reservation.status !== "Reservado") {
+    return {
+      success: false,
+      message: "Apenas reservas reservadas podem iniciar check-in.",
+    };
+  }
+
+  if (!isScheduledReservationActive(reservation)) {
+    return {
+      success: false,
+      message: "A janela da reserva ja foi encerrada e nao permite check-in.",
+    };
+  }
+
+  const validationError = validateOperationPayload("checkin", reservation, payload);
+  if (validationError) {
+    return { success: false, message: validationError };
+  }
+
+  const inspection = buildInspection("checkin", payload, snapshot.currentUserName);
+  const historyItem = buildHistoryItem(
+    "Vistoria de saida concluida",
+    snapshot.currentUserName,
+    payload.notes || `Km ${payload.mileage} | Combustivel ${payload.fuelLevel}`
+  );
+
+  const updatedReservation: Reservation = {
+    ...reservation,
+    status: "Em uso",
+    checkInAt: inspection.inspectedAt,
+    checkInNotes: payload.notes,
+    startMileage: payload.mileage,
+    checkInChecklist: inspection.checklist,
+    checkInFuelLevel: payload.fuelLevel,
+    checkInData: inspection,
+    history: [historyItem, ...reservation.history],
+  };
+
+  await upsertReservation(updatedReservation, historyItem);
+  await appendAuditLog(
+    buildAuditEntry("reservation", updatedReservation.id, "reservation.checkin", snapshot, {
+      code: updatedReservation.code,
+      status: updatedReservation.status,
+      mileage: payload.mileage,
+    })
+  );
+
+  return {
+    success: true,
+    message: "Check-in realizado. A reserva agora esta em uso.",
+    reservation: updatedReservation,
+  };
+}
+
+export async function checkOutReservationUseCase(
+  reservationId: string,
+  payload: ReservationOperationPayload,
+  snapshot: ServiceSnapshot
+): Promise<ActionResult> {
+  const reservation = snapshot.reservations.find((item) => item.id === reservationId);
+
+  if (!reservation) {
+    return { success: false, message: "Reserva nao encontrada." };
+  }
+
+  if (reservation.status !== "Em uso") {
+    return {
+      success: false,
+      message: "Apenas reservas em uso podem finalizar check-out.",
+    };
+  }
+
+  const validationError = validateOperationPayload("checkout", reservation, payload);
+  if (validationError) {
+    return { success: false, message: validationError };
+  }
+
+  const inspection = buildInspection("checkout", payload, snapshot.currentUserName);
+  const historyItem = buildHistoryItem(
+    "Check-in de devolucao concluido",
+    snapshot.currentUserName,
+    payload.notes || `Km ${payload.mileage} | Combustivel ${payload.fuelLevel}`
+  );
+
+  const updatedReservation: Reservation = {
+    ...reservation,
+    status: "Concluida",
+    checkOutAt: inspection.inspectedAt,
+    checkOutNotes: payload.notes,
+    endMileage: payload.mileage,
+    checkOutChecklist: inspection.checklist,
+    checkOutFuelLevel: payload.fuelLevel,
+    checkOutData: inspection,
+    history: [historyItem, ...reservation.history],
+  };
+
+  await upsertReservation(updatedReservation, historyItem);
+  await appendAuditLog(
+    buildAuditEntry("reservation", updatedReservation.id, "reservation.checkout", snapshot, {
+      code: updatedReservation.code,
+      status: updatedReservation.status,
+      mileage: payload.mileage,
+    })
+  );
+
+  return {
+    success: true,
+    message: "Check-out realizado. Reserva concluida e veiculo disponivel.",
+    reservation: updatedReservation,
+  };
+}
+
+export async function toggleResourceMaintenanceUseCase(
+  resourceId: string,
+  snapshot: ServiceSnapshot
+): Promise<ActionResult> {
+  const existingResource = snapshot.resources.find((item) => item.id === resourceId);
+
+  if (!existingResource) {
+    return { success: false, message: "Veiculo nao encontrado." };
+  }
+
+  const nextStatus = existingResource.status === "Manutencao" ? "Disponivel" : "Manutencao";
+  const updatedResource: Resource = {
+    ...existingResource,
+    status: nextStatus,
+    nextAvailableAt:
+      nextStatus === "Manutencao" ? new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString() : undefined,
+  };
+
+  await upsertResource(updatedResource);
+
+  if (nextStatus === "Manutencao") {
+    await activateMaintenance(resourceId, snapshot.currentUserId, "Bloqueio operacional manual");
+  } else {
+    await clearMaintenance(resourceId, snapshot.currentUserId);
+  }
+
+  await appendAuditLog(
+    buildAuditEntry(
+      "resource",
+      updatedResource.id,
+      nextStatus === "Manutencao" ? "resource.maintenance.started" : "resource.maintenance.cleared",
+      snapshot,
+      {
+        code: updatedResource.code,
+        status: updatedResource.status,
+      }
+    )
+  );
+
+  return {
+    success: true,
+    message:
+      nextStatus === "Manutencao"
+        ? "Veiculo marcado em manutencao."
+        : "Veiculo liberado da manutencao.",
+    resource: updatedResource,
+  };
+}
+
+export async function exportReservationsReportUseCase(snapshot: ServiceSnapshot): Promise<ActionResult> {
+  try {
+    const filename = `reservas-sigma-${new Date().toISOString().slice(0, 10)}.csv`;
+    const csv = buildReservationsCsv(snapshot.reservations, snapshot.resources, snapshot.users);
+    const result = await downloadCsvForExcel(filename, csv);
+
+    return {
+      success: true,
+      message: result.message,
+      fileUri: result.fileUri,
+    };
+  } catch {
+    return {
+      success: false,
+      message: "Nao foi possivel gerar o arquivo de reservas.",
+    };
+  }
+}

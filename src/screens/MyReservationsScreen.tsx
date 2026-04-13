@@ -12,7 +12,8 @@ import type { ReservationStatus } from "@/types";
 type ReservationFilter = "Ativas" | "Em uso" | "Concluídas" | "Canceladas";
 
 export function MyReservationsScreen() {
-  const { currentUserId, reservations, resources, cancelReservation } = useReservationStore();
+  const { currentUserId, reservations, resources, cancelReservation, isMutating } =
+    useReservationStore();
   const [filter, setFilter] = useState<ReservationFilter>("Ativas");
   const [feedback, setFeedback] = useState<string | null>(null);
   const referenceDate = new Date();
@@ -62,7 +63,7 @@ export function MyReservationsScreen() {
     });
   };
 
-  const handleReservationAction = (reservationId: string, status: ReservationStatus) => {
+  const handleReservationAction = async (reservationId: string, status: ReservationStatus) => {
     if (status === "Reservado") {
       openOperation(reservationId, "checkin");
       return;
@@ -73,7 +74,7 @@ export function MyReservationsScreen() {
       return;
     }
 
-    const result = cancelReservation(reservationId);
+    const result = await cancelReservation(reservationId);
     setFeedback(result.message);
   };
 
@@ -160,9 +161,14 @@ export function MyReservationsScreen() {
                   {actionLabel ? (
                     <Pressable
                       style={[styles.actionButton, styles.primaryAction]}
-                      onPress={() => handleReservationAction(reservation.id, reservation.status)}
+                      onPress={() => {
+                        void handleReservationAction(reservation.id, reservation.status);
+                      }}
+                      disabled={isMutating}
                     >
-                      <Text style={styles.actionButtonText}>{actionLabel}</Text>
+                      <Text style={styles.actionButtonText}>
+                        {isMutating ? "Processando..." : actionLabel}
+                      </Text>
                     </Pressable>
                   ) : null}
                 </View>

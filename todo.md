@@ -1,130 +1,153 @@
-# TODO de Produção - App Reserva de Veículos Sigma
+# TODO de Producao - App Reserva de Veiculos Sigma
 
-## Status Atual
+## Objetivo deste arquivo
 
-O aplicativo **não está pronto para produção**.
+Este arquivo consolida apenas o que ainda precisa ser resolvido para colocar o app em producao com risco controlado.
 
-Este arquivo consolida os principais entregáveis necessários para levar o app de um MVP demonstrativo para um produto corporativo minimamente confiável para operação real.
+Fluxo operacional real considerado neste backlog:
 
-## Escala de Classificação
+`solicitada -> reservado -> em uso -> concluida -> veiculo disponivel apos checkout`
 
-### Criticidade
-
-- **Crítica**: impede produção ou cria risco operacional grave.
-- **Alta**: não bloqueia sozinha em todos os casos, mas desaconselha fortemente o go-live.
-- **Média**: impacta usabilidade, consistência ou manutenção, mas pode entrar após bloqueadores.
-- **Baixa**: melhoria incremental ou acabamento.
-
-### Importância
-
-- **Obrigatório para go-live**: precisa estar concluído antes de subir em produção.
-- **Muito importante**: deve entrar logo após os bloqueadores, preferencialmente ainda antes do rollout amplo.
-- **Recomendado**: melhora robustez, UX e governança, mas pode ser planejado em seguida.
-- **Evolutivo**: ganho incremental, sem bloquear operação inicial controlada.
+Observacao:
+- Nao existe etapa de aprovacao do gestor neste fluxo.
+- Itens antigos relacionados a `Pendente -> Aprovada/Rejeitada` foram removidos deste backlog executivo.
 
 ---
 
-## 1. Bloqueadores de Produção
+## Diagnostico executivo
 
-| ID | Entregável | Categoria | Criticidade | Importância | O que precisa ser entregue |
+O app ainda nao esta pronto para producao.
+
+Hoje os maiores riscos sao:
+- ausencia de autenticacao real;
+- ausencia de backend persistente e multiusuario;
+- permissoes fracas para acoes criticas;
+- ausencia de auditoria operacional;
+- baixa garantia de qualidade para release.
+
+---
+
+## Proximo desenvolvimento recomendado
+
+A frente recomendada para a proxima etapa e iniciar pela infraestrutura de backend persistente, abrindo caminho para autenticacao, autorizacao e persistencia real do dominio.
+
+Sequencia recomendada agora:
+
+1. `B03` Backend persistente e multiusuario
+2. `B01` Autenticacao real e gestao de sessao
+3. `B02` Autorizacao por perfil e ownership
+4. `B05` Regras operacionais minimas
+5. `B06` Tratamento real de atraso e SLA
+6. `B07` Auditoria e historico persistido
+7. `B08` Testes automatizados das regras centrais
+
+Observacao:
+- `B04` continua critico para go-live, mas fica fora da etapa inicial de infraestrutura.
+- Nome sugerido para o commit inicial desta frente: `feat: inicia infraestrutura de backend persistente`
+
+Subetapas executaveis do `B03`:
+
+1. Definir modelo de dados.
+2. Escolher backend.
+3. Criar camada de servicos/repositorios.
+4. Trocar leituras da store local por leitura remota.
+5. Persistir reservas, veiculos e usuarios.
+
+---
+
+## Bloco 1 - Bloqueadores imediatos
+
+Estes itens impedem go-live.
+
+| Prioridade | ID | Entregavel | Criticidade | Importancia | O que precisa ser entregue |
 |---|---|---|---|---|---|
-| P01 | Autenticação real e gestão de sessão | Segurança / Acesso | Crítica | Obrigatório para go-live | Implementar login real, sessão válida, logout consistente e identificação do usuário autenticado. Remover acesso livre e eliminar o usuário fixo do app. |
-| P02 | Autorização por perfil e ownership | Regras / Segurança | Crítica | Obrigatório para go-live | Garantir que apenas perfis autorizados possam aprovar, cancelar, registrar check-in/check-out, editar cadastros e acessar áreas administrativas. O usuário só pode agir sobre reservas permitidas para seu papel. |
-| P03 | Backend persistente e multiusuário | Arquitetura / Dados | Crítica | Obrigatório para go-live | Substituir mocks e `AsyncStorage` como fonte principal por backend real com persistência centralizada, leitura/escrita confiável e sincronização entre usuários. |
-| P04 | Workflow real de aprovação e rejeição | Negócio | Crítica | Obrigatório para go-live | Implementar ciclo real `Pendente -> Aprovada/Rejeitada`, incluindo fila de aprovação, decisão do gestor, motivo de rejeição e histórico persistido. Hoje a reserva nasce aprovada. |
-| P05 | State machine oficial da reserva | Negócio / Arquitetura | Crítica | Obrigatório para go-live | Formalizar estados válidos e transições permitidas: criação, aprovação, rejeição, cancelamento, retirada, devolução, atraso e encerramento. Alinhar tipos, store e telas. |
-| P06 | Regras operacionais mínimas de elegibilidade | Negócio | Crítica | Obrigatório para go-live | Validar CNH, perfil do usuário, janela de retirada/devolução, datas passadas, veículo inativo/manutenção e consistência temporal da reserva. |
-| P07 | Tratamento real de atraso e SLA | Operação | Crítica | Obrigatório para go-live | Criar lógica para reservas vencidas, mudança para `Em atraso`, alertas e tratamento operacional de devolução fora do prazo. |
-| P08 | Auditoria e histórico persistido | Governança | Crítica | Obrigatório para go-live | Persistir histórico de eventos relevantes: criação, aprovação, rejeição, cancelamento, check-in, check-out, alterações e ações administrativas, com ator e timestamp reais. |
+| 1 | B01 | Autenticacao real e gestao de sessao | Critica | Obrigatorio para go-live | Implementar login real, sessao valida, logout consistente e identificacao do usuario autenticado. Remover acesso livre e eliminar usuario fixo no app. |
+| 2 | B02 | Autorizacao por perfil e ownership | Critica | Obrigatorio para go-live | Garantir que apenas usuarios autorizados possam cancelar reservas, registrar check-in/check-out, editar cadastros e acessar areas administrativas. O usuario so pode agir sobre reservas permitidas ao seu papel. |
+| 3 | B03 | Backend persistente e multiusuario | Critica | Obrigatorio para go-live | Substituir mocks e `AsyncStorage` como fonte principal por backend real com persistencia centralizada, sincronizacao confiavel e dados consistentes entre usuarios e dispositivos. |
+| 4 | B04 | State machine oficial da reserva e do recurso | Critica | Obrigatorio para go-live | Formalizar estados validos e transicoes permitidas para reserva e veiculo: solicitada, reservado, em uso, concluida, cancelada, em atraso, manutencao e disponivel. Alinhar tipos, store, agenda, frota, painel e historico. |
+| 5 | B05 | Regras operacionais minimas de elegibilidade | Critica | Obrigatorio para go-live | Validar CNH, papel do usuario, datas passadas, janela de retirada/devolucao, manutencao, inatividade do veiculo e consistencia temporal da reserva. |
+| 6 | B06 | Tratamento real de atraso e SLA | Critica | Obrigatorio para go-live | Detectar devolucao fora do prazo, mudar status para `Em atraso`, alertar operacao e refletir isso em todas as telas. |
+| 7 | B07 | Auditoria e historico persistido | Critica | Obrigatorio para go-live | Persistir criacao, alteracao, cancelamento, check-in, check-out e acoes administrativas com ator, data/hora e origem da acao. |
+| 8 | B08 | Testes automatizados das regras centrais | Critica | Obrigatorio para go-live | Cobrir conflito de agenda, criacao, cancelamento, check-in, check-out, atraso, manutencao e permissoes. |
 
 ---
 
-## 2. Ajustes Importantes Antes de Escala Real
+## Bloco 2 - Fase 1 de deploy
 
-| ID | Entregável | Categoria | Criticidade | Importância | O que precisa ser entregue |
+Estes itens devem entrar antes de liberar o app para uso real mais amplo.
+
+| Prioridade | ID | Entregavel | Criticidade | Importancia | O que precisa ser entregue |
 |---|---|---|---|---|---|
-| I01 | Parametrização de regras de reserva | Negócio | Alta | Muito importante | Revisar e parametrizar restrições atuais de mesma data e duração entre 1h e 4h. Validar com operação se reservas multi-dia e janelas maiores devem existir. |
-| I02 | Origem, base e contexto operacional dinâmicos | UX / Negócio | Alta | Muito importante | Remover base fixa e demais informações hardcoded do app. Base, centro de custo, área e gestor devem vir do perfil e/ou da reserva. |
-| I03 | Tela real de aprovação | Fluxo | Alta | Muito importante | Entregar uma tela funcional para o gestor aprovar/rejeitar solicitações, com observação da decisão e atualização do estado global. |
-| I04 | Dashboard administrativo confiável | Operação / UX | Alta | Muito importante | Ajustar o painel para refletir dados reais e permitir ações úteis. Hoje ele mostra pendências e manutenção sem capacidade de gestão correspondente. |
-| I05 | Gestão real de manutenção e indisponibilidade | Operação | Alta | Muito importante | Criar fluxo administrativo para bloquear/desbloquear veículo, definir previsão de retorno, motivo e efeito real na agenda. |
-| I06 | Proteção de navegação por papel | Segurança / UX | Alta | Muito importante | Esconder e proteger rotas administrativas, operacionais e de aprovação conforme perfil. |
-| I07 | Consistência de disponibilidade da agenda | Negócio | Alta | Muito importante | Garantir que agenda, detalhe do veículo, reserva ativa e status do recurso mostrem o mesmo estado, inclusive em atrasos e conflitos. |
-| I08 | Tratamento de erro visível ao usuário | Robustez | Alta | Muito importante | Padronizar mensagens de falha, fallback de rede/persistência e feedback de ação. Hoje os `catch` são superficiais e não sustentam produção. |
+| 9 | F01 | Gestao real de manutencao e indisponibilidade | Alta | Muito importante | Criar fluxo administrativo para bloquear/desbloquear veiculo, definir motivo, previsao de retorno e reflexo real na agenda e na disponibilidade. |
+| 10 | F02 | Consistencia total entre Reserva, Agenda, Frota e Painel | Alta | Muito importante | Garantir que toda mudanca de status apareca da mesma forma em todas as telas, usando a mesma fonte de verdade e os mesmos seletores de negocio. |
+| 11 | F03 | Tratamento de erro visivel ao usuario | Alta | Muito importante | Padronizar mensagens de falha, indisponibilidade, erro de persistencia, conflito de reserva e retorno de acoes criticas. |
+| 12 | F04 | Testes ponta a ponta dos fluxos principais | Alta | Muito importante | Validar login, criacao de reserva, visualizacao em agenda/frota, check-in, check-out, cancelamento e disponibilidade final do veiculo. |
+| 13 | F05 | Lint, CI e pipeline minima de release | Alta | Muito importante | Adicionar lint, typecheck, build automatizado e validacao obrigatoria antes de release. |
+| 14 | F06 | Observabilidade minima | Alta | Muito importante | Incluir logging estruturado, captura de erro e monitoracao basica para falhas em producao. |
+| 15 | F07 | Homologacao operacional formal | Alta | Muito importante | Definir checklist de validacao com operacao, usuario final e administrador antes do go-live. |
+| 16 | F08 | Politica minima de dados e rastreabilidade | Alta | Muito importante | Definir retencao, visibilidade de historico, responsabilidade por alteracoes criticas e criterio de auditoria. |
+| 17 | F09 | Protecao de navegacao por papel | Alta | Muito importante | Esconder e proteger rotas administrativas e operacionais conforme perfil do usuario. |
+| 18 | F10 | Revisao do login de apresentacao | Alta | Muito importante | Remover elementos falsos ou de demonstracao do fluxo de acesso antes de publicar. |
 
 ---
 
-## 3. Refatorações Recomendadas
+## Bloco 3 - Fase 2 pos-estabilizacao
 
-| ID | Entregável | Categoria | Criticidade | Importância | O que precisa ser entregue |
+Estes itens melhoram robustez, manutencao e experiencia, mas nao precisam bloquear um rollout controlado se os blocos anteriores estiverem fechados.
+
+| Prioridade | ID | Entregavel | Criticidade | Importancia | O que precisa ser entregue |
 |---|---|---|---|---|---|
-| R01 | Quebra do store central em camadas | Arquitetura | Alta | Recomendado | Separar sessão, reservas, recursos, usuários, exportação e persistência. O store atual concentra responsabilidades demais. |
-| R02 | Serviços e casos de uso explícitos | Arquitetura | Alta | Recomendado | Criar camada de serviços/use cases para `createReservation`, `approveReservation`, `checkIn`, `checkOut`, `cancelReservation`, etc. |
-| R03 | Padronização de modelos e nomenclatura | Arquitetura | Média | Recomendado | Alinhar nomes de status, tipos, labels e campos com o fluxo real do produto e com o documento de contexto. |
-| R04 | Remoção de dados mockados do fluxo principal | Dados / Produto | Alta | Recomendado | Eliminar dependência de PDFs mockados, textos de demo e dados demonstrativos como fonte operacional principal. |
-| R05 | Revisão de componentes reutilizáveis | Front-end | Média | Recomendado | Consolidar padrões visuais e reduzir duplicação entre cards, headers, feedbacks e formulários. |
-| R06 | Estratégia de persistência e sincronização | Arquitetura | Alta | Recomendado | Definir cache local, reidratação, atualização otimista e reconciliação com backend. |
+| 19 | E01 | Parametrizacao das regras de reserva | Alta | Recomendado | Revisar regras de duracao, reservas no mesmo dia, multi-dia e limites operacionais para nao depender de regras fixas no codigo. |
+| 20 | E02 | Origem, base e contexto operacional dinamicos | Alta | Recomendado | Garantir que base, centro de custo, area e gestor venham do perfil e/ou da reserva, sem hardcodes residuais. |
+| 21 | E03 | Dashboard administrativo confiavel e acionavel | Alta | Recomendado | Evoluir o painel para refletir dados reais e permitir acoes uteis de operacao. |
+| 22 | E04 | Estrategia de persistencia e sincronizacao | Alta | Recomendado | Definir cache local, reidratacao, atualizacao otimista e reconciliacao com backend. |
+| 23 | E05 | Quebra do store central em camadas | Alta | Recomendado | Separar sessao, reservas, recursos, usuarios, exportacao e persistencia para reduzir acoplamento. |
+| 24 | E06 | Servicos e casos de uso explicitos | Alta | Recomendado | Criar camada de servicos/use cases para criar reserva, cancelar, check-in, check-out e atualizar recurso. |
+| 25 | E07 | Remocao completa de dados mockados do fluxo principal | Alta | Recomendado | Eliminar PDFs mockados, textos de demo e dados demonstrativos como base operacional. |
+| 26 | E08 | Padronizacao de modelos e nomenclatura | Media | Recomendado | Alinhar status, tipos, labels e nomes de campos ao fluxo real do produto. |
+| 27 | E09 | Revisao do fluxo de nova reserva | Media | Recomendado | Refinar defaults, selecao de horario, selecao de veiculo e feedbacks do formulario. |
+| 28 | E10 | Melhorias de estados vazios e feedback | Media | Recomendado | Ampliar estados vazios, mensagens de retorno e feedback visual de sucesso/erro nas telas principais. |
+| 29 | E11 | Melhorias de navegacao na agenda diaria | Media | Recomendado | Quando houver mais de uma reserva no dia, permitir escolher qual abrir e navegar melhor entre reservas. |
+| 30 | E12 | Ajustes de acessibilidade e clareza | Media | Recomendado | Revisar contraste, CTA, textos, areas clicaveis e semantica de componentes. |
+| 31 | E13 | Revisao de componentes reutilizaveis | Media | Recomendado | Consolidar cards, headers, feedbacks e formularios para reduzir duplicacao visual e tecnica. |
 
 ---
 
-## 4. QA, Confiabilidade e Governança
+## Backlog evolutivo
 
-| ID | Entregável | Categoria | Criticidade | Importância | O que precisa ser entregue |
+Estes itens sao secundarios e devem entrar somente depois da estabilizacao operacional.
+
+| Prioridade | ID | Entregavel | Criticidade | Importancia | O que precisa ser entregue |
 |---|---|---|---|---|---|
-| Q01 | Testes automatizados de regras de negócio | Qualidade | Crítica | Obrigatório para go-live | Cobrir conflito de agenda, aprovação, cancelamento, check-in, check-out, atraso, manutenção e permissões. |
-| Q02 | Testes ponta a ponta dos fluxos principais | Qualidade | Alta | Muito importante | Validar login, agenda, criação de reserva, aprovação, retirada, devolução, cancelamento e histórico. |
-| Q03 | Lint, CI e pipeline mínima de release | Governança | Alta | Muito importante | Adicionar lint, typecheck, build automatizado e pipeline de validação antes de release. |
-| Q04 | Observabilidade mínima | Governança / Operação | Alta | Muito importante | Incluir logging estruturado, rastreamento de erro e monitoração de falhas em produção. |
-| Q05 | Critérios de homologação operacional | Produto / QA | Alta | Muito importante | Definir checklist formal de homologação com operação, gestor e administrador antes do go-live. |
-| Q06 | Política de dados e auditoria | Governança | Alta | Muito importante | Definir retenção, rastreabilidade, consistência de histórico e responsabilidades sobre mudanças críticas. |
+| 32 | X01 | Exportacoes mais completas e administraveis | Media | Evolutivo | Expandir exportacoes, filtros, formatos e rastreio de geracao de relatorios. |
+| 33 | X02 | Melhorias no painel de indicadores | Baixa | Evolutivo | Evoluir metricas, graficos e recortes operacionais depois que os dados estiverem confiaveis. |
+| 34 | X03 | Evolucao para anexos e documentos reais | Media | Evolutivo | Trocar visualizacoes mockadas por anexos reais integrados ao backend. |
+| 35 | X04 | Expansao para outros recursos reservaveis | Media | Evolutivo | Evoluir para materiais e equipamentos somente depois de estabilizar o dominio de veiculos. |
 
 ---
 
-## 5. UX/UI e Fluxos
+## Ordem executiva recomendada
 
-| ID | Entregável | Categoria | Criticidade | Importância | O que precisa ser entregue |
-|---|---|---|---|---|---|
-| U01 | Revisão do fluxo de nova reserva | UX / Fluxo | Média | Recomendado | Corrigir defaults inseguros, impedir datas passadas e melhorar seleção de veículo/horário. |
-| U02 | Melhorias de estados vazios e feedback | UX | Média | Recomendado | Incluir empty states consistentes, retornos visuais após ações e mensagens mais claras em agenda, frota e reservas. |
-| U03 | Melhorias de navegação em agenda diária | UX / Fluxo | Média | Recomendado | Quando houver mais de uma reserva no dia, permitir escolher qual abrir, em vez de sempre abrir a primeira. |
-| U04 | Ajustes de acessibilidade e clareza | UX | Média | Recomendado | Revisar textos, contraste, nomes de CTA, áreas clicáveis e consistência semântica dos botões. |
-| U05 | Revisão do login de apresentação | UX / Produto | Alta | Recomendado | Remover elementos falsos como “Esqueceu a senha?” sem fluxo funcional e o acesso sem login em cenário produtivo. |
-| U06 | Revisão do modal de seleção de veículo | UX | Média | Recomendado | Tornar a lista escalável e navegável para frotas maiores, com scroll, busca e filtros quando necessário. |
-
----
-
-## 6. Backlog de Baixa Prioridade / Evolução
-
-| ID | Entregável | Categoria | Criticidade | Importância | O que precisa ser entregue |
-|---|---|---|---|---|---|
-| E01 | Exportações mais completas e administráveis | Produto | Média | Evolutivo | Expandir exportações, filtros, formatos e rastreio de geração de relatório. |
-| E02 | Melhorias no painel de indicadores | Produto / BI | Baixa | Evolutivo | Evoluir métricas, gráficos e recortes operacionais depois que os dados estiverem confiáveis. |
-| E03 | Evolução para anexos e documentos reais | Produto | Média | Evolutivo | Trocar visualizações mockadas por anexos reais integrados ao backend/document management. |
-| E04 | Expansão para outros recursos reserváveis | Produto / Arquitetura | Média | Evolutivo | Só evoluir para materiais/equipamentos após estabilizar o domínio de veículos. |
+1. Fechar autenticacao, autorizacao e backend.
+2. Formalizar a state machine oficial e as regras operacionais centrais.
+3. Garantir atraso, auditoria e historico persistido.
+4. Fechar testes de regras centrais.
+5. Fechar manutencao, consistencia entre telas e erros operacionais.
+6. Implantar pipeline, observabilidade e homologacao.
+7. Refatorar o que ainda estiver gerando acoplamento e risco de regressao.
+8. Evoluir UX, dashboard e backlog incremental depois da estabilizacao.
 
 ---
 
-## Ordem Ideal de Execução
+## Criterio objetivo de go-live
 
-1. Autenticação, autorização e sessão.
-2. Backend persistente e remoção da dependência de mocks locais.
-3. Workflow de aprovação/rejeição e state machine oficial.
-4. Regras de elegibilidade, atraso, manutenção e auditoria.
-5. Testes automatizados, CI e homologação operacional.
-6. Correções de UX críticas e refinamento de navegação.
-7. Refatorações estruturais para reduzir acoplamento.
-8. Evoluções opcionais após estabilização.
+O app so deve ser considerado apto para producao quando:
 
----
-
-## Critério Objetivo de Go-Live
-
-O app só deve ser considerado apto para produção quando:
-
-- existir autenticação real;
-- houver backend persistente e multiusuário;
-- o fluxo de aprovação estiver funcional;
-- check-in/check-out estiverem protegidos por permissão e auditados;
+- existir autenticacao real;
+- houver backend persistente e multiusuario;
+- a permissao de acoes criticas estiver protegida por perfil e ownership;
+- o fluxo `reservado -> em uso -> concluida` estiver consistente em todas as telas;
 - reservas vencidas forem tratadas corretamente;
-- testes mínimos cobrirem as regras centrais;
-- a homologação operacional tiver sido concluída.
+- historico e auditoria estiverem persistidos;
+- testes minimos cobrirem as regras centrais;
+- a homologacao operacional tiver sido concluida.

@@ -438,6 +438,7 @@ export function SettingsScreen() {
     updateVehicle,
     updateUser,
     exportReservationsReport,
+    isMutating,
   } = useReservationStore();
 
   const [vehicleForm, setVehicleForm] = useState<NewVehiclePayload>(emptyVehicleForm);
@@ -548,10 +549,10 @@ export function SettingsScreen() {
     setUserFeedback(null);
   };
 
-  const handleSaveVehicle = () => {
-    const result = editingVehicleId
+  const handleSaveVehicle = async () => {
+    const result = await (editingVehicleId
       ? updateVehicle(editingVehicleId, vehicleForm)
-      : createVehicle(vehicleForm);
+      : createVehicle(vehicleForm));
     setVehicleFeedback({
       tone: result.success ? "success" : "error",
       message: result.message,
@@ -566,8 +567,8 @@ export function SettingsScreen() {
     }
   };
 
-  const handleSaveUser = () => {
-    const result = editingUserId ? updateUser(editingUserId, userForm) : createUser(userForm);
+  const handleSaveUser = async () => {
+    const result = await (editingUserId ? updateUser(editingUserId, userForm) : createUser(userForm));
     setUserFeedback({
       tone: result.success ? "success" : "error",
       message: result.message,
@@ -909,8 +910,17 @@ export function SettingsScreen() {
 
         <View style={styles.modalActions}>
           <PrimaryButton
-            label={isEditingVehicle ? "Salvar alterações" : "Salvar veículo"}
-            onPress={handleSaveVehicle}
+            label={
+              isMutating
+                ? "Salvando..."
+                : isEditingVehicle
+                  ? "Salvar alterações"
+                  : "Salvar veículo"
+            }
+            onPress={() => {
+              void handleSaveVehicle();
+            }}
+            disabled={isMutating}
           />
           <SecondaryButton
             label={isEditingVehicle ? "Restaurar dados" : "Limpar formulário"}
@@ -1096,8 +1106,17 @@ export function SettingsScreen() {
 
         <View style={styles.modalActions}>
           <PrimaryButton
-            label={isEditingUser ? "Salvar alterações" : "Salvar usuário"}
-            onPress={handleSaveUser}
+            label={
+              isMutating
+                ? "Salvando..."
+                : isEditingUser
+                  ? "Salvar alterações"
+                  : "Salvar usuário"
+            }
+            onPress={() => {
+              void handleSaveUser();
+            }}
+            disabled={isMutating}
           />
           <SecondaryButton
             label={isEditingUser ? "Restaurar dados" : "Limpar formulário"}

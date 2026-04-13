@@ -36,7 +36,7 @@ export function NewReservationScreen({
   initialDate,
   initialResourceId,
 }: NewReservationScreenProps) {
-  const { createReservation, currentUser, reservations, resources, getResourceStatus } =
+  const { createReservation, currentUser, reservations, resources, getResourceStatus, isMutating } =
     useReservationStore();
   const now = new Date();
   const nextWholeHour = getNextWholeHour(now);
@@ -137,7 +137,7 @@ export function NewReservationScreen({
     applyPastTimeFeedback(nextStart);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (isStartDateInPast) {
       setFeedback({
         type: "error",
@@ -146,7 +146,7 @@ export function NewReservationScreen({
       return;
     }
 
-    const result = createReservation({
+    const result = await createReservation({
       resourceId,
       startDate,
       endDate,
@@ -333,11 +333,15 @@ export function NewReservationScreen({
       ) : null}
 
       <Pressable
-        style={[styles.primaryButton, isSubmitDisabled && styles.primaryButtonDisabled]}
-        onPress={handleSave}
-        disabled={isSubmitDisabled}
+        style={[styles.primaryButton, (isSubmitDisabled || isMutating) && styles.primaryButtonDisabled]}
+        onPress={() => {
+          void handleSave();
+        }}
+        disabled={isSubmitDisabled || isMutating}
       >
-        <Text style={styles.primaryButtonText}>Salvar reserva</Text>
+        <Text style={styles.primaryButtonText}>
+          {isMutating ? "Salvando..." : "Salvar reserva"}
+        </Text>
       </Pressable>
 
       <Modal
