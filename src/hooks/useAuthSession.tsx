@@ -172,8 +172,8 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
         return { success: false, message };
       }
 
-      if (normalizedPassword.length < 4) {
-        const message = "A nova senha precisa ter pelo menos 4 digitos.";
+      if (normalizedPassword.length < 6) {
+        const message = "A nova senha precisa ter pelo menos 6 digitos.";
         setAuthError(message);
         return { success: false, message };
       }

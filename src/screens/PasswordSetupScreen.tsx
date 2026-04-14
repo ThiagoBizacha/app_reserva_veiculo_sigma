@@ -68,7 +68,7 @@ export function PasswordSetupScreen() {
           <View style={styles.formStack}>
             <FormField
               label="Nova senha"
-              placeholder="Minimo 8 caracteres"
+              placeholder="Minimo de 6 digitos"
               value={nextPassword}
               onChangeText={(value) => {
                 clearAuthError();
@@ -76,13 +76,14 @@ export function PasswordSetupScreen() {
                 setNextPassword(value);
               }}
               secureTextEntry
+              keyboardType="number-pad"
               autoCapitalize="none"
               autoCorrect={false}
-              maxLength={64}
+              maxLength={12}
             />
             <FormField
               label="Confirmar nova senha"
-              placeholder="Repita a senha"
+              placeholder="Repita os 6 digitos"
               value={confirmation}
               onChangeText={(value) => {
                 clearAuthError();
@@ -90,9 +91,10 @@ export function PasswordSetupScreen() {
                 setConfirmation(value);
               }}
               secureTextEntry
+              keyboardType="number-pad"
               autoCapitalize="none"
               autoCorrect={false}
-              maxLength={64}
+              maxLength={12}
             />
           </View>
 

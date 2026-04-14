@@ -122,7 +122,7 @@ O usuário não precisa configurar nada. Basta:
 2. Abrir o app → ver a tela de login com o logo Sigma
 3. Digitar o email corporativo e a senha temporária
 4. O app redireciona automaticamente para a tela **"Definir nova senha"**
-5. Digitar a nova senha (mínimo 8 caracteres) e confirmar
+5. Digitar a nova senha (mínimo 6 dígitos numéricos) e confirmar
 6. Toque em **Salvar nova senha**
 7. O app libera acesso completo imediatamente
 
@@ -134,14 +134,30 @@ A partir do segundo acesso, o usuário entra diretamente com a senha que definiu
 
 ### Redefinir senha de um usuário
 
-Se um usuário esquecer a senha, o admin pode resetar diretamente no Supabase Auth:
+O jeito mais prático agora é usar o script local do projeto, sem email:
 
-1. Acesse o Supabase Dashboard → Authentication → Users
-2. Localize o usuário pelo email
-3. Clique em **Reset password** e envie a nova senha temporária
-4. Comunique ao usuário — no próximo login, o app não força nova troca automaticamente nesse caso
+```bash
+# Ver a lista de usuários disponíveis
+npm run auth:reset:supabase -- --list
 
-> Alternativa: atualizar `must_change_password: true` nos metadados do usuário no Supabase Auth para forçar a troca na próxima entrada.
+# Resetar por id interno do app
+npm run auth:reset:supabase -- --user=usr-01 --password=123456
+
+# Resetar por matrícula
+npm run auth:reset:supabase -- --matricula=SIG-20451 --password=123456
+```
+
+Por padrão, o script:
+
+- altera a senha no `Supabase Auth`;
+- mantém o vínculo com `public.users`;
+- marca `must_change_password: true`, obrigando o usuário a trocar a senha ao entrar.
+
+Se você quiser resetar a senha sem forçar nova troca:
+
+```bash
+npm run auth:reset:supabase -- --user=usr-01 --password=123456 --no-force-change
+```
 
 ### Adicionar usuários em lote
 
@@ -181,6 +197,12 @@ npm run auth:provision:supabase
 
 # Provisionar com senha específica
 npm run auth:provision:supabase -- --password=MinhaSenh@2024
+
+# Listar usuários disponíveis para reset
+npm run auth:reset:supabase -- --list
+
+# Resetar senha por id interno
+npm run auth:reset:supabase -- --user=usr-01 --password=123456
 
 # Buildar o APK para distribuição
 eas build --profile production --platform android

@@ -47,6 +47,7 @@ supabase/
 scripts/
   seed-supabase-from-mocks.mjs
   provision-supabase-auth-users.mjs
+  reset-supabase-auth-password.mjs
 .env.example
 README.md
 ```
@@ -84,13 +85,14 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your-publishable-key
 
 # Apenas para seed e scripts administrativos locais
 SUPABASE_SERVICE_ROLE_KEY=your-secret-key
-SUPABASE_AUTH_TEMP_PASSWORD=ChangeMe123!
+SUPABASE_AUTH_TEMP_PASSWORD=123456
 ```
 
 Observacoes:
 
 - `SUPABASE_SERVICE_ROLE_KEY` nunca pode ir para o repositorio.
 - `SUPABASE_AUTH_TEMP_PASSWORD` e usada apenas no script que cria usuarios de teste no Supabase Auth.
+- O padrao do projeto agora e senha numerica com minimo de 6 digitos.
 
 ### 4. Popular o backend inicial
 
@@ -124,7 +126,34 @@ Esse script:
 - grava `auth_user_id` em `public.users`.
 
 Todos os usuarios provisionados recebem a mesma senha temporaria definida em `SUPABASE_AUTH_TEMP_PASSWORD`.
-No primeiro login com essa senha, o app redireciona para a tela de definicao da senha definitiva, que agora aceita senha numerica com minimo de 4 digitos.
+No primeiro login com essa senha, o app redireciona para a tela de definicao da senha definitiva, que agora aceita senha numerica com minimo de 6 digitos.
+
+### 6. Resetar senha de um usuario sem email
+
+Para listar os usuarios disponiveis para reset:
+
+```bash
+npm run auth:reset:supabase -- --list
+```
+
+Para resetar por `id` interno:
+
+```bash
+npm run auth:reset:supabase -- --user=usr-01 --password=123456
+```
+
+Para resetar por `matricula`:
+
+```bash
+npm run auth:reset:supabase -- --matricula=SIG-20451 --password=123456
+```
+
+Por padrao, o reset ja marca o usuario para trocar a senha no proximo login.
+Se voce quiser resetar sem forcar nova troca:
+
+```bash
+npm run auth:reset:supabase -- --user=usr-01 --password=123456 --no-force-change
+```
 
 ## Deploy web (produção)
 

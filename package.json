@@ -10,9 +10,11 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "build:web": "expo export --platform web",
+    "generate:icons": "node scripts/generate-icons.mjs",
     "deploy:web": "node scripts/deploy-web.mjs",
     "seed:supabase": "node scripts/seed-supabase-from-mocks.mjs",
-    "auth:provision:supabase": "node scripts/provision-supabase-auth-users.mjs"
+    "auth:provision:supabase": "node scripts/provision-supabase-auth-users.mjs",
+    "auth:reset:supabase": "node scripts/reset-supabase-auth-password.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -42,6 +44,7 @@
   "devDependencies": {
     "@babel/core": "^7.26.10",
     "@types/react": "~19.1.10",
+    "sharp": "^0.34.5",
     "typescript": "~5.9.2"
   }
 }

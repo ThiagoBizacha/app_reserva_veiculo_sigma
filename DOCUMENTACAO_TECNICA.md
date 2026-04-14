@@ -530,7 +530,7 @@ RootLayout (_layout.tsx)
 
 #### PasswordSetupScreen
 - Formulario para troca de senha obrigatoria ou voluntaria
-- Validacao: minimo 8 caracteres, confirmacao
+- Validacao: senha numerica com minimo de 6 digitos, confirmacao
 - Botao "Sair" no primeiro acesso
 
 #### HomeScreen
@@ -927,6 +927,24 @@ npm run auth:provision:supabase
 
 ---
 
+### 12.3. `reset-supabase-auth-password.mjs`
+
+Reseta a senha de qualquer usuario no `Supabase Auth` sem depender de email:
+- lista usuarios disponiveis para reset
+- busca por `id` interno ou `matricula`
+- redefine a senha diretamente no Auth
+- opcionalmente mantem `must_change_password = true` para forcar troca no proximo login
+
+```bash
+npm run auth:reset:supabase -- --list
+npm run auth:reset:supabase -- --user=usr-01 --password=123456
+npm run auth:reset:supabase -- --matricula=SIG-20451 --password=123456
+```
+
+**Requer**: `SUPABASE_SERVICE_ROLE_KEY` no `.env.local`
+
+---
+
 ## 13. Variaveis de Ambiente
 
 | Variavel                        | Contexto      | Descricao                                     |
@@ -934,7 +952,7 @@ npm run auth:provision:supabase
 | `EXPO_PUBLIC_SUPABASE_URL`      | App Expo      | URL do projeto Supabase                       |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | App Expo      | Chave anonima do Supabase                     |
 | `SUPABASE_SERVICE_ROLE_KEY`     | Scripts only  | Chave admin do Supabase (NUNCA no app)        |
-| `SUPABASE_AUTH_TEMP_PASSWORD`   | Scripts only  | Senha temporaria para provisionar usuarios    |
+| `SUPABASE_AUTH_TEMP_PASSWORD`   | Scripts only  | Senha temporaria numerica (minimo 6 digitos)  |
 
 ---
 
