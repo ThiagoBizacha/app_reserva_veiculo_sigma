@@ -1,5 +1,5 @@
 ﻿import { router } from "expo-router";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
   BackHeaderButton,
@@ -9,6 +9,7 @@ import {
   PrimaryButton,
   ReservationCard,
   ScreenContainer,
+  SecondaryButton,
   StatusBadge,
 } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
@@ -22,7 +23,18 @@ interface ResourceDetailScreenProps {
 }
 
 export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) {
-  const { resources, reservations, currentUser } = useReservationStore();
+  const {
+    resources,
+    reservations,
+    currentUser,
+    currentUserPermissions,
+    toggleResourceMaintenance,
+    isMutating,
+  } = useReservationStore();
+  const [maintenanceFeedback, setMaintenanceFeedback] = useState<{
+    tone: "success" | "error";
+    message: string;
+  } | null>(null);
   const resource = resources.find((item) => item.id === resourceId);
 
   if (!resource) {
@@ -44,6 +56,17 @@ export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) 
     .filter((reservation) => canViewReservation(currentUser, reservation))
     .slice(0, 3);
   const nextReservation = snapshot.nextReservation;
+  const canManageMaintenance =
+    currentUserPermissions.canManageMaintenance && resource.category === "Veiculo";
+  const isInMaintenance = computedStatus === "Manutencao";
+
+  const handleToggleMaintenance = async () => {
+    const result = await toggleResourceMaintenance(resource.id);
+    setMaintenanceFeedback({
+      tone: result.success ? "success" : "error",
+      message: result.message,
+    });
+  };
 
   return (
     <ScreenContainer
@@ -114,6 +137,45 @@ export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) 
           ))}
         </View>
       </Card>
+
+      {canManageMaintenance ? (
+        <Card style={styles.maintenanceCard}>
+          <Text style={styles.maintenanceTitle}>Manutenção do veículo</Text>
+          <Text style={styles.maintenanceDescription}>
+            {isInMaintenance
+              ? "O veículo está bloqueado para reserva. Libere a manutenção quando ele voltar para operação."
+              : "Use esta ação para bloquear o veículo para manutenção ou bloqueio operacional."}
+          </Text>
+          {maintenanceFeedback ? (
+            <View
+              style={[
+                styles.feedbackBanner,
+                maintenanceFeedback.tone === "success"
+                  ? styles.feedbackSuccess
+                  : styles.feedbackError,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.feedbackText,
+                  maintenanceFeedback.tone === "success"
+                    ? styles.feedbackTextSuccess
+                    : styles.feedbackTextError,
+                ]}
+              >
+                {maintenanceFeedback.message}
+              </Text>
+            </View>
+          ) : null}
+          <SecondaryButton
+            label={isInMaintenance ? "Liberar manutenção" : "Colocar em manutenção"}
+            onPress={() => {
+              void handleToggleMaintenance();
+            }}
+            disabled={isMutating}
+          />
+        </Card>
+      ) : null}
 
       <PrimaryButton
         label="Ver agenda do veículo"
@@ -201,6 +263,43 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: spacing.md,
+  },
+  maintenanceCard: {
+    gap: spacing.sm,
+  },
+  maintenanceTitle: {
+    color: colors.text,
+    fontSize: typography.cardTitle,
+    fontWeight: "800",
+  },
+  maintenanceDescription: {
+    color: colors.textSecondary,
+    fontSize: typography.bodySmall,
+    lineHeight: 20,
+  },
+  feedbackBanner: {
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+  },
+  feedbackSuccess: {
+    backgroundColor: "#F2FAF3",
+    borderColor: "#B8DEC0",
+  },
+  feedbackError: {
+    backgroundColor: "#FFF4F4",
+    borderColor: "#F1C1C1",
+  },
+  feedbackText: {
+    fontSize: typography.bodySmall,
+    fontWeight: "700",
+  },
+  feedbackTextSuccess: {
+    color: colors.success,
+  },
+  feedbackTextError: {
+    color: colors.danger,
   },
 });
 

@@ -61,7 +61,7 @@ const appOffsetFormatter = new Intl.DateTimeFormat("en-US", {
 export const toDate = (value: string | Date) =>
   value instanceof Date ? new Date(value) : new Date(value);
 
-const getAppDateTimeParts = (value: string | Date) => {
+export const getAppDateTimeParts = (value: string | Date) => {
   const parts = Object.fromEntries(
     appDateTimePartsFormatter
       .formatToParts(toDate(value))

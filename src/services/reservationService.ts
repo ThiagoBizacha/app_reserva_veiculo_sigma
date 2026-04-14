@@ -7,15 +7,17 @@ import {
   getNextReservationCode,
 } from "@/utils/reservationCode";
 import {
-  getResourceConflicts,
-  isResourceInMaintenanceOnDate,
   isScheduledReservationActive,
 } from "@/utils/reservations";
 import { findUserByReference } from "@/utils/users";
 import {
   getDurationHours,
-  isSameCalendarDay,
 } from "@/utils/date";
+import {
+  getCheckInRuleViolation,
+  getCheckOutRuleViolation,
+  getReservationCreationRuleViolation,
+} from "@/utils/operationalRules";
 import {
   canCancelReservation,
   canExecuteReservationOperation,
@@ -273,6 +275,7 @@ function buildUserRecord(
 
 function validateReservationPayload(
   payload: NewReservationPayload,
+  requester: User,
   resources: Resource[],
   reservations: Reservation[]
 ) {
@@ -286,47 +289,18 @@ function validateReservationPayload(
     return "Preencha todos os campos obrigatorios.";
   }
 
-  if (new Date(payload.endDate) < new Date(payload.startDate)) {
-    return "A data final nao pode ser menor que a data inicial.";
-  }
-
-  if (new Date(payload.startDate) < new Date()) {
-    return "Nao e possivel criar reservas com data ou horario no passado.";
-  }
-
-  if (!isSameCalendarDay(payload.startDate, payload.endDate)) {
-    return "A reserva deve comecar e terminar no mesmo dia.";
-  }
-
-  const durationHours = payload.durationHours ?? getDurationHours(payload.startDate, payload.endDate);
-  if (durationHours < 1 || durationHours > 4) {
-    return "A reserva deve ter duracao minima de 1 hora e maxima de 4 horas.";
-  }
-
   const resource = resources.find((item) => item.id === payload.resourceId);
   if (!resource) {
     return "Recurso nao encontrado.";
   }
 
-  if (
-    resource.status === "Manutencao" &&
-    isResourceInMaintenanceOnDate(resource, new Date(payload.startDate))
-  ) {
-    return "O veiculo esta em manutencao e nao pode ser reservado neste periodo.";
-  }
-
-  const conflicts = getResourceConflicts(
+  return getReservationCreationRuleViolation({
+    requester,
+    resource,
     reservations,
-    payload.resourceId,
-    payload.startDate,
-    payload.endDate
-  );
-
-  if (conflicts.length > 0) {
-    return "Ja existe uma reserva para o recurso no horario informado.";
-  }
-
-  return null;
+    startDate: payload.startDate,
+    endDate: payload.endDate,
+  });
 }
 
 function validateOperationPayload(
@@ -550,7 +524,12 @@ export async function createReservationUseCase(
   payload: NewReservationPayload,
   snapshot: ServiceSnapshot
 ): Promise<ActionResult> {
-  const validationError = validateReservationPayload(payload, snapshot.resources, snapshot.reservations);
+  const validationError = validateReservationPayload(
+    payload,
+    snapshot.currentUser,
+    snapshot.resources,
+    snapshot.reservations
+  );
   if (validationError) {
     return { success: false, message: validationError };
   }
@@ -560,8 +539,7 @@ export async function createReservationUseCase(
     return { success: false, message: "Recurso nao encontrado." };
   }
 
-  const durationHours =
-    payload.durationHours ?? getDurationHours(payload.startDate, payload.endDate);
+  const durationHours = getDurationHours(payload.startDate, payload.endDate);
 
   const historyItem = buildHistoryItem(
     "Reserva reservada",
@@ -607,6 +585,12 @@ export async function cancelReservationUseCase(
   snapshot: ServiceSnapshot
 ): Promise<ActionResult> {
   const reservation = snapshot.reservations.find((item) => item.id === reservationId);
+  const requester = reservation
+    ? snapshot.users.find((item) => item.id === reservation.userId)
+    : undefined;
+  const resource = reservation
+    ? snapshot.resources.find((item) => item.id === reservation.resourceId)
+    : undefined;
 
   if (!reservation) {
     return { success: false, message: "Reserva nao encontrada." };
@@ -667,6 +651,12 @@ export async function checkInReservationUseCase(
   snapshot: ServiceSnapshot
 ): Promise<ActionResult> {
   const reservation = snapshot.reservations.find((item) => item.id === reservationId);
+  const requester = reservation
+    ? snapshot.users.find((item) => item.id === reservation.userId)
+    : undefined;
+  const resource = reservation
+    ? snapshot.resources.find((item) => item.id === reservation.resourceId)
+    : undefined;
 
   if (!reservation) {
     return { success: false, message: "Reserva nao encontrada." };
@@ -679,17 +669,15 @@ export async function checkInReservationUseCase(
     };
   }
 
-  if (reservation.status !== "Reservado") {
+  const operationalViolation = getCheckInRuleViolation({
+    reservation,
+    resource,
+    requester,
+  });
+  if (operationalViolation) {
     return {
       success: false,
-      message: "Apenas reservas reservadas podem iniciar check-in.",
-    };
-  }
-
-  if (!isScheduledReservationActive(reservation)) {
-    return {
-      success: false,
-      message: "A janela da reserva ja foi encerrada e nao permite check-in.",
+      message: operationalViolation,
     };
   }
 
@@ -751,10 +739,11 @@ export async function checkOutReservationUseCase(
     };
   }
 
-  if (reservation.status !== "Em uso") {
+  const operationalViolation = getCheckOutRuleViolation({ reservation });
+  if (operationalViolation) {
     return {
       success: false,
-      message: "Apenas reservas em uso podem finalizar check-out.",
+      message: operationalViolation,
     };
   }
 

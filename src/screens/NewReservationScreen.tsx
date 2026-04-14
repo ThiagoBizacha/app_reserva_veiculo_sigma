@@ -1,7 +1,7 @@
 ﻿import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { BackHeaderButton, EmptyState, PageHeader, ScreenContainer, StatusBadge } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
@@ -13,12 +13,17 @@ import {
   formatAppDate,
   formatDateTime,
   formatTime,
-  getNextWholeHour,
+  getAppDateTimeParts,
   isPastDateTime,
-  isSameCalendarDay,
   mergeDateAndTimeInAppTimeZone,
   startOfDay,
 } from "@/utils/date";
+import {
+  getAvailablePickupHours,
+  getNextOperationalReservationStart,
+  getRequesterReservationEligibilityViolation,
+  getReservationCreationRuleViolation,
+} from "@/utils/operationalRules";
 import { getResourceConflicts } from "@/utils/reservations";
 
 interface NewReservationScreenProps {
@@ -29,8 +34,17 @@ interface NewReservationScreenProps {
 type PickerField = "date" | null;
 
 const durationOptions = [1, 2, 3, 4] as const;
-const hourOptions = Array.from({ length: 24 }, (_, index) => index);
 const INVALID_PAST_TIME_MESSAGE = "Escolha um horário futuro para continuar.";
+const NO_PICKUP_HOURS_MESSAGE = "Nao ha mais horarios de retirada disponiveis para esta data. Escolha outro dia.";
+
+function buildPickupTime(hour: number) {
+  return createDateInAppTimeZone({
+    year: 2000,
+    month: 1,
+    day: 1,
+    hour,
+  });
+}
 
 export function NewReservationScreen({
   initialDate,
@@ -39,17 +53,12 @@ export function NewReservationScreen({
   const { createReservation, currentUser, reservations, resources, getResourceStatus, isMutating } =
     useReservationStore();
   const now = new Date();
-  const nextWholeHour = getNextWholeHour(now);
-  const requestedDate = initialDate ? new Date(initialDate) : nextWholeHour;
-  const safeRequestedDate = isPastDateTime(requestedDate) ? nextWholeHour : requestedDate;
-  const defaultDay = startOfDay(safeRequestedDate);
-  const defaultTime = (() => {
-    if (isSameCalendarDay(safeRequestedDate, now)) {
-      return nextWholeHour;
-    }
-
-    return addHours(startOfDay(safeRequestedDate), 8);
-  })();
+  const initialReservationStart = getNextOperationalReservationStart(
+    initialDate ? new Date(initialDate) : undefined,
+    now
+  );
+  const defaultDay = startOfDay(initialReservationStart);
+  const defaultTime = initialReservationStart;
 
   const vehicleOptions = resources.filter((item) => item.category === "Veiculo");
   const hasVehicleOptions = vehicleOptions.length > 0;
@@ -74,6 +83,10 @@ export function NewReservationScreen({
   }, [pickupTime, reservationDate]);
 
   const endDate = useMemo(() => addHours(startDate, durationHours).toISOString(), [durationHours, startDate]);
+  const availablePickupHours = useMemo(
+    () => getAvailablePickupHours(reservationDate),
+    [reservationDate]
+  );
 
   const selectedResource = vehicleOptions.find((resource) => resource.id === resourceId);
   const conflicts = useMemo(
@@ -84,14 +97,40 @@ export function NewReservationScreen({
     ? getResourceStatus(selectedResource.id, new Date(startDate))
     : "Disponivel";
   const selectedPickupHourLabel = formatTime(pickupTime);
-  const isStartDateInPast = isPastDateTime(startDate, new Date());
+  const requesterEligibilityViolation = getRequesterReservationEligibilityViolation(currentUser);
+  const noPickupHoursForDay = availablePickupHours.length === 0 ? NO_PICKUP_HOURS_MESSAGE : null;
+  const reservationRuleViolation =
+    noPickupHoursForDay ??
+    requesterEligibilityViolation ??
+    (selectedResource
+      ? getReservationCreationRuleViolation({
+          requester: currentUser,
+          resource: selectedResource,
+          reservations,
+          startDate,
+          endDate,
+        })
+      : null);
   const todayStart = startOfDay(new Date());
   const isSubmitDisabled =
     !resourceId ||
     !purpose.trim() ||
     !base.trim() ||
     conflicts.length > 0 ||
-    isStartDateInPast;
+    Boolean(reservationRuleViolation);
+
+  useEffect(() => {
+    if (availablePickupHours.length === 0) {
+      return;
+    }
+
+    const pickupHour = getAppDateTimeParts(pickupTime).hour;
+    if (availablePickupHours.includes(pickupHour)) {
+      return;
+    }
+
+    setPickupTime(buildPickupTime(availablePickupHours[0]));
+  }, [availablePickupHours, pickupTime]);
 
   const applyPastTimeFeedback = (nextStart: Date) => {
     const currentDate = new Date();
@@ -124,12 +163,7 @@ export function NewReservationScreen({
   };
 
   const handleSelectHour = (hour: number) => {
-    const nextTime = createDateInAppTimeZone({
-      year: 2000,
-      month: 1,
-      day: 1,
-      hour,
-    });
+    const nextTime = buildPickupTime(hour);
     const nextStart = mergeDateAndTimeInAppTimeZone(reservationDate, nextTime);
 
     setPickupTime(nextTime);
@@ -138,10 +172,10 @@ export function NewReservationScreen({
   };
 
   const handleSave = async () => {
-    if (isStartDateInPast) {
+    if (reservationRuleViolation) {
       setFeedback({
         type: "error",
-        message: "Não é possível salvar reservas com data ou horário no passado.",
+        message: reservationRuleViolation,
       });
       return;
     }
@@ -176,8 +210,8 @@ export function NewReservationScreen({
       <View style={styles.heroCard}>
         <Text style={styles.heroTitle}>Nova Reserva</Text>
         <Text style={styles.heroSubtitle}>
-          Escolha o horário de retirada e a duração de uso. Cada reserva pode ter no mínimo 1h e
-          no máximo 4h no mesmo dia.
+          Escolha a retirada entre 08h e 18h. Cada reserva pode ter de 1h a 4h e precisa prever
+          devolucao ate 19h no mesmo dia.
         </Text>
       </View>
 
@@ -229,7 +263,11 @@ export function NewReservationScreen({
           <Feather name="calendar" size={18} color={colors.textMuted} />
         </Pressable>
 
-        <Pressable style={styles.selector} onPress={() => setShowHourModal(true)}>
+        <Pressable
+          style={[styles.selector, availablePickupHours.length === 0 && styles.selectorDisabled]}
+          onPress={() => setShowHourModal(true)}
+          disabled={availablePickupHours.length === 0}
+        >
           <Text style={styles.selectorText}>Retirada: {formatDateTime(startDate)}</Text>
           <Feather name="clock" size={18} color={colors.textMuted} />
         </Pressable>
@@ -286,13 +324,11 @@ export function NewReservationScreen({
         />
       </Section>
 
-      <Section title="Bloqueios por Horário">
-        {isStartDateInPast ? (
+      <Section title="Bloqueios Operacionais">
+        {reservationRuleViolation && conflicts.length === 0 ? (
           <View style={styles.conflictCard}>
-            <Text style={styles.conflictTitle}>Horário inválido</Text>
-            <Text style={styles.conflictLine}>
-              Escolha uma data e horário futuros para criar a reserva.
-            </Text>
+            <Text style={styles.conflictTitle}>Reserva bloqueada</Text>
+            <Text style={styles.conflictLine}>{reservationRuleViolation}</Text>
           </View>
         ) : conflicts.length === 0 ? (
           <View style={styles.freeState}>
@@ -417,7 +453,7 @@ export function NewReservationScreen({
               contentContainerStyle={styles.hourList}
               showsVerticalScrollIndicator={false}
             >
-              {hourOptions.map((hour) => {
+              {availablePickupHours.map((hour) => {
                 const hourLabel = `${String(hour).padStart(2, "0")}:00`;
                 const isSelected = selectedPickupHourLabel === hourLabel;
 
@@ -433,6 +469,11 @@ export function NewReservationScreen({
                   </Pressable>
                 );
               })}
+              {availablePickupHours.length === 0 ? (
+                <View style={styles.hourEmptyState}>
+                  <Text style={styles.hourEmptyStateText}>{NO_PICKUP_HOURS_MESSAGE}</Text>
+                </View>
+              ) : null}
             </ScrollView>
             <Pressable style={styles.secondaryButton} onPress={() => setShowHourModal(false)}>
               <Text style={styles.secondaryButtonText}>Fechar</Text>
@@ -790,6 +831,21 @@ const styles = StyleSheet.create({
   hourList: {
     gap: spacing.sm,
     paddingBottom: spacing.xs,
+  },
+  hourEmptyState: {
+    minHeight: 56,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
+  },
+  hourEmptyStateText: {
+    color: colors.textSecondary,
+    fontSize: typography.bodySmall,
+    textAlign: "center",
   },
   hourItem: {
     minHeight: 48,

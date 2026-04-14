@@ -7,6 +7,7 @@ import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import { canCancelReservation, canExecuteReservationOperation } from "@/utils/authorization";
 import { formatDateTime } from "@/utils/date";
+import { getCheckInRuleViolation } from "@/utils/operationalRules";
 import { getResourceById, isScheduledReservationActive } from "@/utils/reservations";
 import type { ReservationStatus } from "@/types";
 
@@ -66,12 +67,26 @@ export function MyReservationsScreen() {
 
   const handleReservationAction = async (reservationId: string, status: ReservationStatus) => {
     const reservation = reservations.find((item) => item.id === reservationId);
+    const resource = reservation ? getResourceById(resources, reservation.resourceId) : undefined;
 
     if (!reservation) {
       return;
     }
 
-    if (status === "Reservado" && canExecuteReservationOperation(currentUser, reservation)) {
+    const checkInViolation =
+      status === "Reservado"
+        ? getCheckInRuleViolation({
+            reservation,
+            resource,
+            requester: currentUser,
+          })
+        : null;
+
+    if (
+      status === "Reservado" &&
+      canExecuteReservationOperation(currentUser, reservation) &&
+      !checkInViolation
+    ) {
       openOperation(reservationId, "checkin");
       return;
     }
@@ -129,15 +144,23 @@ export function MyReservationsScreen() {
             description="Selecione outro grupo ou inicie uma nova reserva pela agenda."
           />
         ) : (
-          filteredReservations.map((reservation) => {
-            const resource = getResourceById(resources, reservation.resourceId);
-            const canOperateReservation = canExecuteReservationOperation(currentUser, reservation);
-            const canCancelCurrentReservation = canCancelReservation(currentUser, reservation);
-            const actionLabel =
-              reservation.status === "Reservado" && canOperateReservation
-                ? "Iniciar vistoria de saída"
-                : reservation.status === "Em uso" && canOperateReservation
-                  ? "Registrar devolução"
+      filteredReservations.map((reservation) => {
+        const resource = getResourceById(resources, reservation.resourceId);
+        const canOperateReservation = canExecuteReservationOperation(currentUser, reservation);
+        const canCancelCurrentReservation = canCancelReservation(currentUser, reservation);
+        const checkInViolation =
+          reservation.status === "Reservado"
+            ? getCheckInRuleViolation({
+                reservation,
+                resource,
+                requester: currentUser,
+              })
+            : null;
+        const actionLabel =
+          reservation.status === "Reservado" && canOperateReservation && !checkInViolation
+            ? "Iniciar vistoria de saída"
+            : reservation.status === "Em uso" && canOperateReservation
+              ? "Registrar devolução"
                   : reservation.status === "Reservado" && canCancelCurrentReservation
                     ? "Cancelar reserva"
                   : undefined;

@@ -66,6 +66,11 @@ export const isScheduledReservationActive = (
   referenceDate: string | Date = new Date()
 ) => reservation.status === "Reservado" && !hasReservationEnded(reservation, referenceDate);
 
+export const isReservationCheckInWindowOpen = (
+  reservation: ReservationWindow,
+  referenceDate: string | Date = new Date()
+) => reservation.status === "Reservado" && isReservationInCurrentWindow(reservation, referenceDate);
+
 export const isReservationActiveNow = (
   reservation: ReservationWindow,
   referenceDate: string | Date = new Date()
@@ -338,7 +343,7 @@ export const getReservationOverview = (
       (reservation) =>
         reservation.status === "Em uso" ||
         reservation.status === "Em atraso" ||
-        isScheduledReservationActive(reservation, referenceDate)
+        isReservationCheckInWindowOpen(reservation, referenceDate)
     ),
     today: sortedReservations.filter(
       (reservation) =>

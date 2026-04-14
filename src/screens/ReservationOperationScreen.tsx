@@ -24,6 +24,7 @@ import {
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import { formatDateTime } from "@/utils/date";
+import { getCheckInRuleViolation, getCheckOutRuleViolation } from "@/utils/operationalRules";
 import {
   formatMileageValue,
   fuelLevelOptions,
@@ -34,7 +35,7 @@ import {
   requiredPhotoSlots,
 } from "@/utils/operation";
 import { canExecuteReservationOperation } from "@/utils/authorization";
-import { getResourceById, isScheduledReservationActive } from "@/utils/reservations";
+import { getResourceById } from "@/utils/reservations";
 import type {
   FuelLevel,
   OperationPhoto,
@@ -82,6 +83,7 @@ export function ReservationOperationScreen({
   const {
     reservations,
     resources,
+    users,
     currentUser,
     currentUserName,
     checkInReservation,
@@ -90,6 +92,7 @@ export function ReservationOperationScreen({
   } = useReservationStore();
   const reservation = reservations.find((item) => item.id === reservationId);
   const resource = reservation ? getResourceById(resources, reservation.resourceId) : undefined;
+  const requester = reservation ? users.find((item) => item.id === reservation.userId) : undefined;
   const resolvedMode = useMemo<"checkin" | "checkout">(() => {
     if (mode === "checkin" || mode === "checkout") {
       return mode;
@@ -146,11 +149,16 @@ export function ReservationOperationScreen({
       : ["Fotos", "Condições", "Encerrar"];
   const title =
     resolvedMode === "checkin" ? "Vistoria de Saída" : "Check-in de Devolução";
-  const modeAllowed =
-    (resolvedMode === "checkin" &&
-      reservation?.status === "Reservado" &&
-      isScheduledReservationActive(reservation)) ||
-    (resolvedMode === "checkout" && reservation?.status === "Em uso");
+  const operationViolation =
+    reservation && resource
+      ? resolvedMode === "checkin"
+        ? getCheckInRuleViolation({
+            reservation,
+            resource,
+            requester,
+          })
+        : getCheckOutRuleViolation({ reservation })
+      : "A operacao solicitada nao esta disponivel.";
   const requiredPhotoCount = getRequiredPhotoCount(requiredPhotos);
   const startMileage = reservation?.startMileage;
   const travelDistance = getTravelDistance(startMileage, mileage);
@@ -179,13 +187,13 @@ export function ReservationOperationScreen({
     );
   }
 
-  if (!modeAllowed) {
+  if (operationViolation) {
     return (
       <View style={styles.emptyWrapper}>
         <EmptyState
           icon="lock"
           title="Operação indisponível"
-          description="O status atual da reserva não permite executar esta operação."
+          description={operationViolation}
         />
       </View>
     );

@@ -20,13 +20,13 @@ import {
   canViewReservation,
 } from "@/utils/authorization";
 import { formatDateTime } from "@/utils/date";
+import { getCheckInRuleViolation } from "@/utils/operationalRules";
 import {
   formatMileageValue,
   getAllOperationPhotos,
   getTravelDistance,
   requiredPhotoSlots,
 } from "@/utils/operation";
-import { isScheduledReservationActive } from "@/utils/reservations";
 import type { ReservationInspection } from "@/types";
 
 interface ReservationDetailScreenProps {
@@ -72,9 +72,17 @@ export function ReservationDetailScreen({ reservationId }: ReservationDetailScre
 
   const resource = resources.find((item) => item.id === reservation.resourceId);
   const requester = users.find((item) => item.id === reservation.userId);
+  const checkInViolation =
+    reservation.status === "Reservado"
+      ? getCheckInRuleViolation({
+          reservation,
+          resource,
+          requester,
+        })
+      : null;
   const canStartCheckIn =
     reservation.status === "Reservado" &&
-    isScheduledReservationActive(reservation) &&
+    !checkInViolation &&
     canExecuteReservationOperation(currentUser, reservation);
   const canStartCheckOut =
     reservation.status === "Em uso" && canExecuteReservationOperation(currentUser, reservation);
@@ -132,6 +140,14 @@ export function ReservationDetailScreen({ reservationId }: ReservationDetailScre
 
       {canStartCheckIn ? (
         <PrimaryButton label="Abrir vistoria de saída" onPress={() => openOperation("checkin")} />
+      ) : null}
+
+      {reservation.status === "Reservado" &&
+      canExecuteReservationOperation(currentUser, reservation) &&
+      checkInViolation ? (
+        <View style={styles.feedbackWarning}>
+          <Text style={styles.feedbackWarningText}>{checkInViolation}</Text>
+        </View>
       ) : null}
 
       {canStartCheckOut ? (
@@ -314,6 +330,18 @@ const styles = StyleSheet.create({
   },
   feedbackText: {
     color: colors.primaryDark,
+    fontSize: typography.bodySmall,
+    fontWeight: "700",
+  },
+  feedbackWarning: {
+    borderRadius: 12,
+    backgroundColor: "#FFF7E6",
+    borderWidth: 1,
+    borderColor: "#F3C766",
+    padding: spacing.md,
+  },
+  feedbackWarningText: {
+    color: "#8A5A00",
     fontSize: typography.bodySmall,
     fontWeight: "700",
   },

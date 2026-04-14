@@ -63,6 +63,103 @@ Subetapas executaveis do `B05`:
 
 ---
 
+## Detalhamento dos proximos bloqueadores
+
+### B05 - Regras operacionais minimas
+
+Objetivo:
+Garantir que o sistema nao aceite reservas e operacoes incoerentes com a operacao real da frota.
+
+Escopo esperado:
+- validar se o usuario logado pode criar a reserva para si mesmo naquele contexto;
+- impedir criacao de reserva com data/hora no passado;
+- impedir criacao fora da janela operacional permitida para retirada e devolucao;
+- impedir criacao quando o veiculo estiver indisponivel, em manutencao ou ja comprometido no periodo;
+- impedir inconsistencias temporais como fim antes do inicio, duracao invalida e retorno antes da retirada;
+- validar precondicoes minimas para check-in e check-out antes de persistir a mudanca de status;
+- alinhar essas regras entre formulario, store, servicos e backend.
+
+Entregaveis:
+- regras centralizadas em casos de uso/servicos, sem duplicacao por tela;
+- mensagens de erro objetivas para cada violacao operacional relevante;
+- queries e mutacoes protegidas contra estados invalidos mesmo fora da UI.
+
+Criterio de aceite:
+- o app bloqueia reservas invalidas antes de persistir;
+- o backend rejeita operacoes incompatveis com o estado atual;
+- veiculo indisponivel nao pode ser reservado nem operado indevidamente.
+
+### B06 - Tratamento real de atraso e SLA
+
+Objetivo:
+Tratar devolucoes em atraso como estado operacional real, e nao apenas como informacao visual.
+
+Escopo esperado:
+- detectar automaticamente quando uma reserva em uso ultrapassou o horario de devolucao;
+- mudar o status para `Em atraso` com base em regra consistente e reproduzivel;
+- refletir `Em atraso` em Minhas Reservas, Agenda, Frota, Painel e Detalhe;
+- destacar impacto no recurso, evitando falsa percepcao de disponibilidade;
+- registrar timestamps e informacoes minimas para acompanhamento operacional;
+- preparar base para alertas, indicadores e futuros SLAs por area ou tipo de recurso.
+
+Entregaveis:
+- logica central de calculo de atraso;
+- atualizacao persistida do status ou derivacao oficial padronizada em todas as telas;
+- visualizacao clara de reservas atrasadas no fluxo operacional.
+
+Criterio de aceite:
+- uma reserva vencida aparece como `Em atraso` em todas as telas relevantes;
+- o recurso associado nao fica disponivel por engano;
+- check-out posterior retira corretamente o estado de atraso e conclui a reserva.
+
+### B07 - Auditoria e historico persistido
+
+Objetivo:
+Garantir rastreabilidade real das acoes criticas do sistema.
+
+Escopo esperado:
+- persistir criacao, cancelamento, check-in, check-out e atualizacoes administrativas;
+- registrar ator, data/hora, entidade afetada e tipo de acao;
+- diferenciar historico funcional da reserva e trilha de auditoria administrativa;
+- registrar alteracoes de usuario, recurso, manutencao e operacoes criticas;
+- manter leitura consistente desse historico para consulta posterior e suporte operacional.
+
+Entregaveis:
+- uso efetivo e consistente de `reservation_history` e `audit_log`;
+- padrao unico para nomes de evento, payload e origem da acao;
+- telas ou consultas minimas para inspecionar historico quando necessario.
+
+Criterio de aceite:
+- toda acao critica deixa registro persistido;
+- e possivel identificar quem fez, quando fez e em qual entidade;
+- historico da reserva e auditoria administrativa nao se perdem apos reinicio ou troca de dispositivo.
+
+### B08 - Testes automatizados das regras centrais
+
+Objetivo:
+Reduzir regressao nas regras que bloqueiam go-live.
+
+Escopo esperado:
+- testes das regras de elegibilidade de reserva;
+- testes de conflito de agenda e indisponibilidade;
+- testes de cancelamento por ownership;
+- testes de check-in, check-out e transicoes invalidas;
+- testes de atraso e liberacao correta do recurso;
+- testes das permissoes por perfil mais criticas;
+- cobertura dos casos felizes e dos casos que devem falhar.
+
+Entregaveis:
+- suite automatizada executavel no pipeline;
+- cenarios minimos de servico/use case para as regras de negocio;
+- base suficiente para validar release sem depender apenas de teste manual.
+
+Criterio de aceite:
+- os cenarios centrais rodam de forma repetivel;
+- uma regressao em permissao, atraso, conflito ou operacao invalida quebra a suite;
+- release deixa de depender exclusivamente de conferencia manual.
+
+---
+
 ## Bloco 1 - Status dos bloqueadores imediatos
 
 Estes itens definem o nucleo obrigatorio para go-live.
