@@ -135,16 +135,13 @@ Para adicionar o ícone na tela inicial: Chrome → menu ⋮ → "Adicionar à t
 
 ### Publicar atualização
 
-Após alterar o código, rode os 2 comandos abaixo na raiz do projeto:
+Após alterar o código, rode **um único comando** na raiz do projeto:
 
 ```bash
-# 1. Gera o bundle web atualizado
-npm run build:web
-
-# 2. Faz o deploy para https://sigma-reserva.vercel.app
-cd dist && npx vercel --prod --yes && cd ..
+npm run deploy:web
 ```
 
+Esse comando faz tudo: gera o bundle, vincula ao projeto `sigma-reserva` no Vercel e faz o deploy.
 O link permanece o mesmo após cada deploy — não precisa repassar para os usuários.
 
 ## Como rodar o app
