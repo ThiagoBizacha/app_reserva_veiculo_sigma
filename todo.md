@@ -19,56 +19,64 @@ Observacao:
 O app ainda nao esta pronto para producao.
 
 Hoje os maiores riscos sao:
-- ausencia de autenticacao real;
-- ausencia de backend persistente e multiusuario;
-- permissoes fracas para acoes criticas;
+- ausencia de regras operacionais completas de elegibilidade;
+- ausencia de tratamento real de atraso e SLA;
 - ausencia de auditoria operacional;
 - baixa garantia de qualidade para release.
+
+## Concluido recentemente
+
+As seguintes frentes ja foram fechadas e validadas:
+
+- `B04` State machine oficial da reserva e do recurso
+- `B03` Backend persistente e multiusuario
+- `B01` Autenticacao real e gestao de sessao
+- `B02` Autorizacao por perfil e ownership com RLS validada para `Solicitante`, `Operacao` e `Administrador`
 
 ---
 
 ## Proximo desenvolvimento recomendado
 
-A frente recomendada para a proxima etapa e iniciar pela infraestrutura de backend persistente, abrindo caminho para autenticacao, autorizacao e persistencia real do dominio.
+A frente recomendada para a proxima etapa e fechar as regras operacionais e os mecanismos de seguranca de release que ainda faltam para go-live.
 
 Sequencia recomendada agora:
 
-1. `B03` Backend persistente e multiusuario
-2. `B01` Autenticacao real e gestao de sessao
-3. `B02` Autorizacao por perfil e ownership
-4. `B05` Regras operacionais minimas
-5. `B06` Tratamento real de atraso e SLA
-6. `B07` Auditoria e historico persistido
-7. `B08` Testes automatizados das regras centrais
+1. `B05` Regras operacionais minimas
+2. `B06` Tratamento real de atraso e SLA
+3. `B07` Auditoria e historico persistido
+4. `B08` Testes automatizados das regras centrais
+5. `F01` Gestao real de manutencao e indisponibilidade
+6. `F04` Testes ponta a ponta dos fluxos principais
+7. `F05` Lint, CI e pipeline minima de release
 
 Observacao:
-- `B04` continua critico para go-live, mas fica fora da etapa inicial de infraestrutura.
-- Nome sugerido para o commit inicial desta frente: `feat: inicia infraestrutura de backend persistente`
+- `B03`, `B01`, `B02` e `B04` ja sairam da lista de bloqueadores abertos.
+- Nome sugerido para o commit inicial da proxima frente: `feat: inicia regras operacionais minimas`
 
-Subetapas executaveis do `B03`:
+Subetapas executaveis do `B05`:
 
-1. Definir modelo de dados.
-2. Escolher backend.
-3. Criar camada de servicos/repositorios.
-4. Trocar leituras da store local por leitura remota.
-5. Persistir reservas, veiculos e usuarios.
+1. Revisar regras de elegibilidade por perfil e CNH.
+2. Fechar validacao de janelas de retirada e devolucao.
+3. Endurecer bloqueios de datas passadas e inconsistencias temporais.
+4. Alinhar manutencao e indisponibilidade com criacao/edicao de reserva.
+5. Cobrir regras invalidas com testes automatizados.
 
 ---
 
-## Bloco 1 - Bloqueadores imediatos
+## Bloco 1 - Status dos bloqueadores imediatos
 
-Estes itens impedem go-live.
+Estes itens definem o nucleo obrigatorio para go-live.
 
-| Prioridade | ID | Entregavel | Criticidade | Importancia | O que precisa ser entregue |
+| Prioridade | ID | Entregavel | Status | Criticidade | Situacao atual |
 |---|---|---|---|---|---|
-| 1 | B01 | Autenticacao real e gestao de sessao | Critica | Obrigatorio para go-live | Implementar login real, sessao valida, logout consistente e identificacao do usuario autenticado. Remover acesso livre e eliminar usuario fixo no app. |
-| 2 | B02 | Autorizacao por perfil e ownership | Critica | Obrigatorio para go-live | Garantir que apenas usuarios autorizados possam cancelar reservas, registrar check-in/check-out, editar cadastros e acessar areas administrativas. O usuario so pode agir sobre reservas permitidas ao seu papel. |
-| 3 | B03 | Backend persistente e multiusuario | Critica | Obrigatorio para go-live | Substituir mocks e `AsyncStorage` como fonte principal por backend real com persistencia centralizada, sincronizacao confiavel e dados consistentes entre usuarios e dispositivos. |
-| 4 | B04 | State machine oficial da reserva e do recurso | Critica | Obrigatorio para go-live | Formalizar estados validos e transicoes permitidas para reserva e veiculo: solicitada, reservado, em uso, concluida, cancelada, em atraso, manutencao e disponivel. Alinhar tipos, store, agenda, frota, painel e historico. |
-| 5 | B05 | Regras operacionais minimas de elegibilidade | Critica | Obrigatorio para go-live | Validar CNH, papel do usuario, datas passadas, janela de retirada/devolucao, manutencao, inatividade do veiculo e consistencia temporal da reserva. |
-| 6 | B06 | Tratamento real de atraso e SLA | Critica | Obrigatorio para go-live | Detectar devolucao fora do prazo, mudar status para `Em atraso`, alertar operacao e refletir isso em todas as telas. |
-| 7 | B07 | Auditoria e historico persistido | Critica | Obrigatorio para go-live | Persistir criacao, alteracao, cancelamento, check-in, check-out e acoes administrativas com ator, data/hora e origem da acao. |
-| 8 | B08 | Testes automatizados das regras centrais | Critica | Obrigatorio para go-live | Cobrir conflito de agenda, criacao, cancelamento, check-in, check-out, atraso, manutencao e permissoes. |
+| 1 | B01 | Autenticacao real e gestao de sessao | Concluido | Critica | Login real com Supabase Auth, sessao persistida, logout consistente e troca obrigatoria da senha temporaria no primeiro acesso. |
+| 2 | B02 | Autorizacao por perfil e ownership | Concluido | Critica | Perfis `Solicitante`, `Operacao` e `Administrador` validados no app e no banco com RLS e ownership. |
+| 3 | B03 | Backend persistente e multiusuario | Concluido | Critica | Supabase ativo como fonte unica de verdade para usuarios, veiculos, reservas e historico. |
+| 4 | B04 | State machine oficial da reserva e do recurso | Concluido | Critica | Fluxo real consolidado: `reservado -> em uso -> concluida`, com veiculo disponivel apos checkout. |
+| 5 | B05 | Regras operacionais minimas de elegibilidade | Pendente | Critica | Validar CNH, papel do usuario, datas passadas, janela de retirada/devolucao, manutencao, inatividade do veiculo e consistencia temporal da reserva. |
+| 6 | B06 | Tratamento real de atraso e SLA | Pendente | Critica | Detectar devolucao fora do prazo, mudar status para `Em atraso`, alertar operacao e refletir isso em todas as telas. |
+| 7 | B07 | Auditoria e historico persistido | Pendente | Critica | Persistir criacao, alteracao, cancelamento, check-in, check-out e acoes administrativas com ator, data/hora e origem da acao. |
+| 8 | B08 | Testes automatizados das regras centrais | Pendente | Critica | Cobrir conflito de agenda, criacao, cancelamento, check-in, check-out, atraso, manutencao e permissoes. |
 
 ---
 
@@ -128,14 +136,13 @@ Estes itens sao secundarios e devem entrar somente depois da estabilizacao opera
 
 ## Ordem executiva recomendada
 
-1. Fechar autenticacao, autorizacao e backend.
-2. Formalizar a state machine oficial e as regras operacionais centrais.
-3. Garantir atraso, auditoria e historico persistido.
-4. Fechar testes de regras centrais.
-5. Fechar manutencao, consistencia entre telas e erros operacionais.
-6. Implantar pipeline, observabilidade e homologacao.
-7. Refatorar o que ainda estiver gerando acoplamento e risco de regressao.
-8. Evoluir UX, dashboard e backlog incremental depois da estabilizacao.
+1. Fechar regras operacionais minimas de elegibilidade.
+2. Garantir atraso, SLA, auditoria e historico persistido.
+3. Fechar testes automatizados das regras centrais.
+4. Fechar manutencao, consistencia entre telas e erros operacionais.
+5. Implantar pipeline, observabilidade e homologacao.
+6. Refatorar o que ainda estiver gerando acoplamento e risco de regressao.
+7. Evoluir UX, dashboard e backlog incremental depois da estabilizacao.
 
 ---
 

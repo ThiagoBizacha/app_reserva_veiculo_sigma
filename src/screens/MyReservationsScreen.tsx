@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { EmptyState, PageHeader, ScreenContainer, StatusBadge } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
+import { canCancelReservation, canExecuteReservationOperation } from "@/utils/authorization";
 import { formatDateTime } from "@/utils/date";
 import { getResourceById, isScheduledReservationActive } from "@/utils/reservations";
 import type { ReservationStatus } from "@/types";
@@ -12,7 +13,7 @@ import type { ReservationStatus } from "@/types";
 type ReservationFilter = "Ativas" | "Em uso" | "Concluídas" | "Canceladas";
 
 export function MyReservationsScreen() {
-  const { currentUserId, reservations, resources, cancelReservation, isMutating } =
+  const { currentUser, currentUserId, reservations, resources, cancelReservation, isMutating } =
     useReservationStore();
   const [filter, setFilter] = useState<ReservationFilter>("Ativas");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -64,13 +65,23 @@ export function MyReservationsScreen() {
   };
 
   const handleReservationAction = async (reservationId: string, status: ReservationStatus) => {
-    if (status === "Reservado") {
+    const reservation = reservations.find((item) => item.id === reservationId);
+
+    if (!reservation) {
+      return;
+    }
+
+    if (status === "Reservado" && canExecuteReservationOperation(currentUser, reservation)) {
       openOperation(reservationId, "checkin");
       return;
     }
 
-    if (status === "Em uso") {
+    if (status === "Em uso" && canExecuteReservationOperation(currentUser, reservation)) {
       openOperation(reservationId, "checkout");
+      return;
+    }
+
+    if (!canCancelReservation(currentUser, reservation)) {
       return;
     }
 
@@ -120,11 +131,15 @@ export function MyReservationsScreen() {
         ) : (
           filteredReservations.map((reservation) => {
             const resource = getResourceById(resources, reservation.resourceId);
+            const canOperateReservation = canExecuteReservationOperation(currentUser, reservation);
+            const canCancelCurrentReservation = canCancelReservation(currentUser, reservation);
             const actionLabel =
-              reservation.status === "Reservado"
+              reservation.status === "Reservado" && canOperateReservation
                 ? "Iniciar vistoria de saída"
-                : reservation.status === "Em uso"
+                : reservation.status === "Em uso" && canOperateReservation
                   ? "Registrar devolução"
+                  : reservation.status === "Reservado" && canCancelCurrentReservation
+                    ? "Cancelar reserva"
                   : undefined;
 
             return (

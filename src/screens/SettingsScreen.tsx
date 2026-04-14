@@ -32,7 +32,7 @@ type FeedbackState = {
 };
 
 const vehicleCategories: VehicleCategory[] = ["Sedan", "SUV", "Pickup"];
-const userRoles: UserRole[] = ["Solicitante", "Gestor", "Operação", "Administrador"];
+const userRoles: UserRole[] = ["Solicitante", "Operação", "Administrador"];
 const cnhStatuses: CnhStatus[] = ["Válida", "Vencida"];
 
 const emptyVehicleForm: NewVehiclePayload = {
@@ -50,7 +50,6 @@ const emptyVehicleForm: NewVehiclePayload = {
   nextMaintenanceDate: "",
   nextMaintenanceMileage: "",
   observation: "",
-  requiresApproval: true,
 };
 
 function buildInitialUserForm(matriz: string, gestorId?: string): NewUserPayload {
@@ -91,7 +90,6 @@ function mapVehicleToForm(resource: Resource): NewVehiclePayload {
     nextMaintenanceDate: resource.nextMaintenanceDate ?? "",
     nextMaintenanceMileage: resource.nextMaintenanceMileage ?? "",
     observation: resource.observation ?? "",
-    requiresApproval: resource.requiresApproval,
   };
 }
 
@@ -435,6 +433,7 @@ export function SettingsScreen() {
     users,
     reservations,
     currentUser,
+    currentUserPermissions,
     createVehicle,
     createUser,
     updateVehicle,
@@ -644,131 +643,148 @@ export function SettingsScreen() {
           onPress={() => router.push("/password-setup")}
         />
 
-        <SettingsActionCard
-          icon="truck"
-          title="Gerenciar veículos"
-          subtitle="Cadastre um novo veículo ou abra a lista quando quiser editar um cadastro existente."
-          helper={`${totalVehicles} veículos cadastrados`}
-          buttonLabel="Cadastrar veículo"
-          secondaryButtonLabel={
-            isVehicleCatalogOpen ? "Ocultar veículos cadastrados" : "Ver veículos cadastrados"
-          }
-          onSecondaryPress={() => setIsVehicleCatalogOpen((current) => !current)}
-          onPress={openVehicleModal}
-          feedback={!isVehicleModalOpen ? vehicleFeedback : null}
-        >
-          {isVehicleCatalogOpen ? (
-            <>
-              <View style={styles.catalogHeader}>
-                <View style={styles.catalogHeaderCopy}>
-                  <Text style={styles.catalogTitle}>Veículos cadastrados</Text>
-                  <Text style={styles.catalogSubtitle}>
-                    Toque em um item para abrir a edição com os dados preenchidos.
-                  </Text>
-                </View>
-                <View style={styles.catalogHeaderBadge}>
-                  <Feather name="chevron-up" size={18} color={colors.primaryDark} />
-                </View>
-              </View>
+        {currentUserPermissions.canManageUsers ? (
+          <>
+            <SettingsActionCard
+              icon="truck"
+              title="Gerenciar veículos"
+              subtitle="Cadastre um novo veículo ou abra a lista quando quiser editar um cadastro existente."
+              helper={`${totalVehicles} veículos cadastrados`}
+              buttonLabel="Cadastrar veículo"
+              secondaryButtonLabel={
+                isVehicleCatalogOpen ? "Ocultar veículos cadastrados" : "Ver veículos cadastrados"
+              }
+              onSecondaryPress={() => setIsVehicleCatalogOpen((current) => !current)}
+              onPress={openVehicleModal}
+              feedback={!isVehicleModalOpen ? vehicleFeedback : null}
+            >
+              {isVehicleCatalogOpen ? (
+                <>
+                  <View style={styles.catalogHeader}>
+                    <View style={styles.catalogHeaderCopy}>
+                      <Text style={styles.catalogTitle}>Veículos cadastrados</Text>
+                      <Text style={styles.catalogSubtitle}>
+                        Toque em um item para abrir a edição com os dados preenchidos.
+                      </Text>
+                    </View>
+                    <View style={styles.catalogHeaderBadge}>
+                      <Feather name="chevron-up" size={18} color={colors.primaryDark} />
+                    </View>
+                  </View>
 
-              <View style={styles.catalogList}>
-                {vehicles.length > 0 ? (
-                  vehicles.map((vehicle) => (
-                    <CatalogItem
-                      key={vehicle.id}
-                      icon="truck"
-                      title={`${vehicle.code} · ${vehicle.name}`}
-                      subtitle={`${vehicle.plate ?? "Sem placa"} · ${vehicle.brand ?? "-"} ${vehicle.model ?? ""}`.trim()}
-                      meta={`Locadora: ${vehicle.rentalCompany ?? "-"} | Km: ${vehicle.currentMileage ?? "-"}`}
-                      badgeLabel={getVehicleStatusLabel(vehicle.status)}
-                      badgeTone={getVehicleStatusTone(vehicle.status)}
-                      onPress={() => openVehicleEditModal(vehicle)}
-                    />
-                  ))
-                ) : (
-                  <Text style={styles.catalogEmptyState}>
-                    Nenhum veículo cadastrado no momento.
-                  </Text>
-                )}
-              </View>
-            </>
-          ) : null}
-        </SettingsActionCard>
+                  <View style={styles.catalogList}>
+                    {vehicles.length > 0 ? (
+                      vehicles.map((vehicle) => (
+                        <CatalogItem
+                          key={vehicle.id}
+                          icon="truck"
+                          title={`${vehicle.code} · ${vehicle.name}`}
+                          subtitle={`${vehicle.plate ?? "Sem placa"} · ${vehicle.brand ?? "-"} ${vehicle.model ?? ""}`.trim()}
+                          meta={`Locadora: ${vehicle.rentalCompany ?? "-"} | Km: ${vehicle.currentMileage ?? "-"}`}
+                          badgeLabel={getVehicleStatusLabel(vehicle.status)}
+                          badgeTone={getVehicleStatusTone(vehicle.status)}
+                          onPress={() => openVehicleEditModal(vehicle)}
+                        />
+                      ))
+                    ) : (
+                      <Text style={styles.catalogEmptyState}>
+                        Nenhum veículo cadastrado no momento.
+                      </Text>
+                    )}
+                  </View>
+                </>
+              ) : null}
+            </SettingsActionCard>
 
-        <SettingsActionCard
-          icon="users"
-          title="Gerenciar usuários"
-          subtitle="Cadastre novas pessoas e abra a lista apenas quando quiser editar um usuário existente."
-          helper={`${users.length} usuários cadastrados`}
-          buttonLabel="Cadastrar usuário"
-          secondaryButtonLabel={
-            isUserCatalogOpen ? "Ocultar usuários cadastrados" : "Ver usuários cadastrados"
-          }
-          onSecondaryPress={() => setIsUserCatalogOpen((current) => !current)}
-          onPress={openUserModal}
-          feedback={!isUserModalOpen ? userFeedback : null}
-        >
-          {isUserCatalogOpen ? (
-            <>
-              <View style={styles.catalogHeader}>
-                <View style={styles.catalogHeaderCopy}>
-                  <Text style={styles.catalogTitle}>Usuários cadastrados</Text>
-                  <Text style={styles.catalogSubtitle}>
-                    Selecione um cadastro para revisar perfil, CNH, contato e anexos.
-                  </Text>
+            <SettingsActionCard
+              icon="users"
+              title="Gerenciar usuários"
+              subtitle="Cadastre novas pessoas e abra a lista apenas quando quiser editar um usuário existente."
+              helper={`${users.length} usuários cadastrados`}
+              buttonLabel="Cadastrar usuário"
+              secondaryButtonLabel={
+                isUserCatalogOpen ? "Ocultar usuários cadastrados" : "Ver usuários cadastrados"
+              }
+              onSecondaryPress={() => setIsUserCatalogOpen((current) => !current)}
+              onPress={openUserModal}
+              feedback={!isUserModalOpen ? userFeedback : null}
+            >
+              {isUserCatalogOpen ? (
+                <>
+                  <View style={styles.catalogHeader}>
+                    <View style={styles.catalogHeaderCopy}>
+                      <Text style={styles.catalogTitle}>Usuários cadastrados</Text>
+                      <Text style={styles.catalogSubtitle}>
+                        Selecione um cadastro para revisar perfil, CNH, contato e anexos.
+                      </Text>
+                    </View>
+                    <View style={styles.catalogHeaderBadge}>
+                      <Feather name="chevron-up" size={18} color={colors.primaryDark} />
+                    </View>
+                  </View>
+
+                  <View style={styles.catalogList}>
+                    {orderedUsers.length > 0 ? (
+                      orderedUsers.map((user) => (
+                        <CatalogItem
+                          key={user.id}
+                          icon="user"
+                          title={user.fullName}
+                          subtitle={`${user.role} · ${user.matricula}`}
+                          meta={`${user.areaDepartamento} | ${user.emailCorporativo}`}
+                          badgeLabel={getCnhStatusLabel(user.cnhStatus)}
+                          badgeTone={getCnhStatusTone(user.cnhStatus)}
+                          onPress={() => openUserEditModal(user)}
+                        />
+                      ))
+                    ) : (
+                      <Text style={styles.catalogEmptyState}>
+                        Nenhum usuário cadastrado no momento.
+                      </Text>
+                    )}
+                  </View>
+                </>
+              ) : null}
+            </SettingsActionCard>
+
+            <Card style={styles.actionCard}>
+              <View style={styles.actionCardTopRow}>
+                <View style={styles.actionIconBadge}>
+                  <Feather name="download" size={20} color={colors.primaryDark} />
                 </View>
-                <View style={styles.catalogHeaderBadge}>
-                  <Feather name="chevron-up" size={18} color={colors.primaryDark} />
-                </View>
+                <Text style={styles.actionHelper}>{reservations.length} linhas prontas</Text>
               </View>
+              <Text style={styles.sectionTitle}>Baixar base CSV</Text>
+              <Text style={styles.sectionSubtitle}>
+                Gera um arquivo `.csv` com status, solicitante, carro, período, check-in, check-out,
+                checklist, histórico e demais dados da reserva para salvar no computador.
+              </Text>
 
-              <View style={styles.catalogList}>
-                {orderedUsers.length > 0 ? (
-                  orderedUsers.map((user) => (
-                    <CatalogItem
-                      key={user.id}
-                      icon="user"
-                      title={user.fullName}
-                      subtitle={`${user.role} · ${user.matricula}`}
-                      meta={`${user.areaDepartamento} | ${user.emailCorporativo}`}
-                      badgeLabel={getCnhStatusLabel(user.cnhStatus)}
-                      badgeTone={getCnhStatusTone(user.cnhStatus)}
-                      onPress={() => openUserEditModal(user)}
-                    />
-                  ))
-                ) : (
-                  <Text style={styles.catalogEmptyState}>
-                    Nenhum usuário cadastrado no momento.
-                  </Text>
-                )}
+              <PrimaryButton
+                label={isExporting ? "Preparando CSV..." : "Baixar CSV"}
+                onPress={() => {
+                  void handleExport();
+                }}
+                disabled={isExporting}
+              />
+
+              {exportFeedback ? <FeedbackBanner feedback={exportFeedback} /> : null}
+            </Card>
+          </>
+        ) : (
+          <Card style={styles.actionCard}>
+            <View style={styles.actionCardTopRow}>
+              <View style={styles.actionIconBadge}>
+                <Feather name="lock" size={20} color={colors.primaryDark} />
               </View>
-            </>
-          ) : null}
-        </SettingsActionCard>
-
-        <Card style={styles.actionCard}>
-          <View style={styles.actionCardTopRow}>
-            <View style={styles.actionIconBadge}>
-              <Feather name="download" size={20} color={colors.primaryDark} />
+              <Text style={styles.actionHelper}>Acesso restrito</Text>
             </View>
-            <Text style={styles.actionHelper}>{reservations.length} linhas prontas</Text>
-          </View>
-          <Text style={styles.sectionTitle}>Baixar base CSV</Text>
-          <Text style={styles.sectionSubtitle}>
-            Gera um arquivo `.csv` com status, solicitante, carro, período, check-in, check-out,
-            checklist, histórico e demais dados da reserva para salvar no computador.
-          </Text>
-
-          <PrimaryButton
-            label={isExporting ? "Preparando CSV..." : "Baixar CSV"}
-            onPress={() => {
-              void handleExport();
-            }}
-            disabled={isExporting}
-          />
-
-          {exportFeedback ? <FeedbackBanner feedback={exportFeedback} /> : null}
-        </Card>
+            <Text style={styles.sectionTitle}>Gestão administrativa</Text>
+            <Text style={styles.sectionSubtitle}>
+              Cadastro de usuários, veículos e exportação da base ficam disponíveis apenas para o perfil Administrador.
+            </Text>
+          </Card>
+        )}
       </ScreenContainer>
 
       <FormModal
@@ -882,14 +898,6 @@ export function SettingsScreen() {
                 placeholder="30000"
                 value={vehicleForm.nextMaintenanceMileage}
                 onChangeText={(value) => updateVehicleField("nextMaintenanceMileage", value)}
-              />
-            </View>
-            <View style={styles.column}>
-              <ChoiceGroup
-                label="Controle especial"
-                value={vehicleForm.requiresApproval ? "Sim" : "Não"}
-                options={["Sim", "Não"]}
-                onChange={(value) => updateVehicleField("requiresApproval", value === "Sim")}
               />
             </View>
           </View>
@@ -1052,7 +1060,7 @@ export function SettingsScreen() {
             </View>
             <View style={styles.column}>
               <FormField
-                label="Gestor"
+                label="Superior imediato"
                 placeholder={currentManagerDisplayName || currentUser.fullName}
                 value={userForm.gestorId}
                 onChangeText={(value) => updateUserField("gestorId", value)}

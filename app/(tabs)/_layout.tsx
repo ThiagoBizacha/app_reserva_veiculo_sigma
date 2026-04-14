@@ -1,8 +1,11 @@
 import { Feather } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors } from "@/theme";
 
 export default function TabsLayout() {
+  const { currentUserPermissions } = useReservationStore();
+
   return (
     <Tabs
       screenOptions={({ route }) => ({
@@ -38,7 +41,14 @@ export default function TabsLayout() {
       <Tabs.Screen name="resources" options={{ title: "Frota" }} />
       <Tabs.Screen name="settings" options={{ title: "Config." }} />
       <Tabs.Screen name="check-flow" options={{ href: null }} />
-      <Tabs.Screen name="admin" options={{ href: null }} />
+      <Tabs.Screen
+        name="admin"
+        options={
+          currentUserPermissions.canAccessAdminPanel
+            ? { title: "Painel" }
+            : { href: null }
+        }
+      />
     </Tabs>
   );
 }

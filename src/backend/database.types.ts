@@ -208,7 +208,6 @@ export interface Database {
           last_inspection_date: string | null;
           last_maintenance_date: string | null;
           last_maintenance_mileage: string | null;
-          location: string;
           model: string | null;
           name: string;
           next_available_at: string | null;
@@ -217,8 +216,6 @@ export interface Database {
           observation: string | null;
           plate: string | null;
           rental_company: string | null;
-          requires_approval: boolean;
-          responsible: string | null;
           status: string;
           tags: Json;
           updated_at: string;
@@ -241,7 +238,6 @@ export interface Database {
           last_inspection_date?: string | null;
           last_maintenance_date?: string | null;
           last_maintenance_mileage?: string | null;
-          location: string;
           model?: string | null;
           name: string;
           next_available_at?: string | null;
@@ -250,8 +246,6 @@ export interface Database {
           observation?: string | null;
           plate?: string | null;
           rental_company?: string | null;
-          requires_approval?: boolean;
-          responsible?: string | null;
           status: string;
           tags?: Json;
           updated_at?: string;
@@ -335,7 +329,38 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      current_app_user_id: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
+      current_app_user_role: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
+      current_auth_email: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
+      cancel_own_reservation: {
+        Args: {
+          p_reservation_id: string;
+        };
+        Returns: Database["public"]["Tables"]["reservations"]["Row"];
+      };
+      current_user_has_role: {
+        Args: {
+          allowed_roles: string[];
+        };
+        Returns: boolean;
+      };
+      link_current_user_auth: {
+        Args: {
+          p_user_id: string;
+        };
+        Returns: Database["public"]["Tables"]["users"]["Row"];
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

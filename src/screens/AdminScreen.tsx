@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import type { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { BackHeaderButton, PageHeader, ScreenContainer } from "@/components";
+import { BackHeaderButton, EmptyState, PageHeader, ScreenContainer } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
 import { formatDate, formatDateTime } from "@/utils/date";
@@ -11,7 +11,22 @@ import {
 import type { ReservationStatus, Resource } from "@/types";
 
 export function AdminScreen() {
-  const { resources, reservations, getResourceStatus, getSummary } = useReservationStore();
+  const { resources, reservations, getResourceStatus, getSummary, currentUserPermissions } =
+    useReservationStore();
+
+  if (!currentUserPermissions.canAccessAdminPanel) {
+    return (
+      <ScreenContainer>
+        <PageHeader title="Painel da Frota" leftAction={<BackHeaderButton />} />
+        <EmptyState
+          icon="lock"
+          title="Acesso restrito"
+          description="Este painel fica disponível apenas para os perfis Operação e Administrador."
+        />
+      </ScreenContainer>
+    );
+  }
+
   const summary = getSummary();
   const today = new Date();
   const vehicles = resources.filter((resource) => resource.category === "Veiculo");

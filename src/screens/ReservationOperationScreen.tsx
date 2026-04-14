@@ -33,6 +33,7 @@ import {
   parseMileageValue,
   requiredPhotoSlots,
 } from "@/utils/operation";
+import { canExecuteReservationOperation } from "@/utils/authorization";
 import { getResourceById, isScheduledReservationActive } from "@/utils/reservations";
 import type {
   FuelLevel,
@@ -81,6 +82,7 @@ export function ReservationOperationScreen({
   const {
     reservations,
     resources,
+    currentUser,
     currentUserName,
     checkInReservation,
     checkOutReservation,
@@ -160,6 +162,18 @@ export function ReservationOperationScreen({
           icon="alert-circle"
           title="Reserva não encontrada"
           description="A operação solicitada não está disponível."
+        />
+      </View>
+    );
+  }
+
+  if (!canExecuteReservationOperation(currentUser, reservation)) {
+    return (
+      <View style={styles.emptyWrapper}>
+        <EmptyState
+          icon="lock"
+          title="Operação restrita"
+          description="Check-in e check-out ficam disponíveis apenas para Operação e Administrador."
         />
       </View>
     );

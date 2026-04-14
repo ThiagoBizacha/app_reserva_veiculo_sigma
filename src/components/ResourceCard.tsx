@@ -27,7 +27,7 @@ export function ResourceCard({ resource }: ResourceCardProps) {
         <Text style={styles.metaLabel}>
           {resource.category === "Veiculo"
             ? resource.plate ?? resource.code
-            : resource.location}
+            : resource.code}
         </Text>
         <Text style={styles.metaLabel}>
           {resource.category === "Veiculo"

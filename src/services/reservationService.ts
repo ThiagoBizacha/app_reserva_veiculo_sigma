@@ -16,6 +16,11 @@ import {
   getDurationHours,
   isSameCalendarDay,
 } from "@/utils/date";
+import {
+  canCancelReservation,
+  canExecuteReservationOperation,
+  getUserPermissions,
+} from "@/utils/authorization";
 import type {
   NewReservationPayload,
   NewUserPayload,
@@ -29,7 +34,11 @@ import type {
 import { appendAuditLog } from "@/backend/repositories/auditRepository";
 import type { Json } from "@/backend/database.types";
 import { clearMaintenance, activateMaintenance } from "@/backend/repositories/maintenanceRepository";
-import { upsertReservation } from "@/backend/repositories/reservationsRepository";
+import {
+  appendReservationHistory,
+  cancelOwnReservation,
+  upsertReservation,
+} from "@/backend/repositories/reservationsRepository";
 import { upsertResource } from "@/backend/repositories/resourcesRepository";
 import { upsertUser } from "@/backend/repositories/usersRepository";
 import { generateEntityId } from "@/backend/utils";
@@ -162,11 +171,8 @@ function buildVehicleRecord(
     lastMaintenanceMileage: existingResource?.lastMaintenanceMileage ?? normalizedMileage,
     nextMaintenanceMileage: payload.nextMaintenanceMileage?.trim() || undefined,
     observation: payload.observation?.trim() || undefined,
-    location: payload.location?.trim() || existingResource?.location || "Base interna",
     capacity: existingResource?.capacity ?? "5 lugares",
     description: payload.description.trim(),
-    responsible: existingResource?.responsible || undefined,
-    requiresApproval: payload.requiresApproval ?? true,
     imageHint: payload.vehicleCategory.toLowerCase(),
     nextAvailableAt: existingResource?.nextAvailableAt,
     tags: [payload.vehicleCategory, normalizedBrand, normalizedModel].filter(Boolean),
@@ -217,7 +223,7 @@ function validateUserPayload(payload: NewUserPayload, users: User[], userId?: st
   }
 
   if (payload.gestorId?.trim() && !findUserByReference(users, payload.gestorId)) {
-    return "Gestor nao encontrado. Informe nome, e-mail, matricula ou ID de um colaborador existente.";
+    return "Superior imediato nao encontrado. Informe nome, e-mail, matricula ou ID de um colaborador existente.";
   }
 
   return null;
@@ -402,6 +408,13 @@ export async function createVehicleUseCase(
   payload: NewVehiclePayload,
   snapshot: ServiceSnapshot
 ): Promise<ActionResult> {
+  if (!getUserPermissions(snapshot.currentUser).canManageFleet) {
+    return {
+      success: false,
+      message: "Apenas Administrador pode cadastrar veiculos.",
+    };
+  }
+
   const validationError = validateVehiclePayload(payload, snapshot.resources);
   if (validationError) {
     return { success: false, message: validationError };
@@ -428,6 +441,13 @@ export async function updateVehicleUseCase(
   payload: NewVehiclePayload,
   snapshot: ServiceSnapshot
 ): Promise<ActionResult> {
+  if (!getUserPermissions(snapshot.currentUser).canManageFleet) {
+    return {
+      success: false,
+      message: "Apenas Administrador pode atualizar veiculos.",
+    };
+  }
+
   const existingResource = snapshot.resources.find((item) => item.id === resourceId);
 
   if (!existingResource) {
@@ -459,6 +479,13 @@ export async function createUserUseCase(
   payload: NewUserPayload,
   snapshot: ServiceSnapshot
 ): Promise<ActionResult> {
+  if (!getUserPermissions(snapshot.currentUser).canManageUsers) {
+    return {
+      success: false,
+      message: "Apenas Administrador pode cadastrar usuarios.",
+    };
+  }
+
   const validationError = validateUserPayload(payload, snapshot.users);
   if (validationError) {
     return { success: false, message: validationError };
@@ -485,6 +512,13 @@ export async function updateUserUseCase(
   payload: NewUserPayload,
   snapshot: ServiceSnapshot
 ): Promise<ActionResult> {
+  if (!getUserPermissions(snapshot.currentUser).canManageUsers) {
+    return {
+      success: false,
+      message: "Apenas Administrador pode atualizar usuarios.",
+    };
+  }
+
   const existingUser = snapshot.users.find((item) => item.id === userId);
 
   if (!existingUser) {
@@ -578,6 +612,13 @@ export async function cancelReservationUseCase(
     return { success: false, message: "Reserva nao encontrada." };
   }
 
+  if (!canCancelReservation(snapshot.currentUser, reservation)) {
+    return {
+      success: false,
+      message: "Seu perfil nao pode cancelar esta reserva.",
+    };
+  }
+
   if (reservation.status !== "Reservado") {
     return {
       success: false,
@@ -599,7 +640,13 @@ export async function cancelReservationUseCase(
     history: [historyItem, ...reservation.history],
   };
 
-  await upsertReservation(updatedReservation, historyItem);
+  if (getUserPermissions(snapshot.currentUser).canManageFleet) {
+    await upsertReservation(updatedReservation, historyItem);
+  } else {
+    await cancelOwnReservation(updatedReservation.id);
+    await appendReservationHistory(updatedReservation.id, historyItem);
+  }
+
   await appendAuditLog(
     buildAuditEntry("reservation", updatedReservation.id, "reservation.cancelled", snapshot, {
       code: updatedReservation.code,
@@ -623,6 +670,13 @@ export async function checkInReservationUseCase(
 
   if (!reservation) {
     return { success: false, message: "Reserva nao encontrada." };
+  }
+
+  if (!canExecuteReservationOperation(snapshot.currentUser, reservation)) {
+    return {
+      success: false,
+      message: "Check-in disponivel apenas para Operacao e Administrador.",
+    };
   }
 
   if (reservation.status !== "Reservado") {
@@ -690,6 +744,13 @@ export async function checkOutReservationUseCase(
     return { success: false, message: "Reserva nao encontrada." };
   }
 
+  if (!canExecuteReservationOperation(snapshot.currentUser, reservation)) {
+    return {
+      success: false,
+      message: "Check-out disponivel apenas para Operacao e Administrador.",
+    };
+  }
+
   if (reservation.status !== "Em uso") {
     return {
       success: false,
@@ -741,6 +802,13 @@ export async function toggleResourceMaintenanceUseCase(
   resourceId: string,
   snapshot: ServiceSnapshot
 ): Promise<ActionResult> {
+  if (!getUserPermissions(snapshot.currentUser).canManageMaintenance) {
+    return {
+      success: false,
+      message: "Apenas Operacao e Administrador podem alterar manutencao da frota.",
+    };
+  }
+
   const existingResource = snapshot.resources.find((item) => item.id === resourceId);
 
   if (!existingResource) {
@@ -754,8 +822,6 @@ export async function toggleResourceMaintenanceUseCase(
     nextAvailableAt:
       nextStatus === "Manutencao" ? new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString() : undefined,
   };
-
-  await upsertResource(updatedResource);
 
   if (nextStatus === "Manutencao") {
     await activateMaintenance(resourceId, snapshot.currentUserId, "Bloqueio operacional manual");
@@ -787,6 +853,13 @@ export async function toggleResourceMaintenanceUseCase(
 }
 
 export async function exportReservationsReportUseCase(snapshot: ServiceSnapshot): Promise<ActionResult> {
+  if (!getUserPermissions(snapshot.currentUser).canExportReservations) {
+    return {
+      success: false,
+      message: "A exportacao da base CSV fica disponivel apenas para Administrador.",
+    };
+  }
+
   try {
     const filename = `reservas-sigma-${new Date().toISOString().slice(0, 10)}.csv`;
     const csv = buildReservationsCsv(snapshot.reservations, snapshot.resources, snapshot.users);

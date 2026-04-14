@@ -1,6 +1,6 @@
 ﻿export type CnhStatus = "Válida" | "Vencida";
 
-export type UserRole = "Solicitante" | "Gestor" | "Operação" | "Administrador";
+export type UserRole = "Solicitante" | "Operação" | "Administrador";
 
 export interface NewUserPayload {
   name: string;

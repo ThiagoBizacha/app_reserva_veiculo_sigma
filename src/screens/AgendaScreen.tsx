@@ -180,8 +180,7 @@ export function AgendaScreen({ initialResourceId }: AgendaScreenProps) {
             {selectedResource.model ?? ""}
           </Text>
           <Text style={styles.resourceMeta}>
-            {selectedResource.location} | {selectedResource.rentalCompany ?? "-"} | Km{" "}
-            {selectedResource.currentMileage ?? "-"}
+            {selectedResource.rentalCompany ?? "-"} | Km {selectedResource.currentMileage ?? "-"}
           </Text>
         </View>
       ) : null}

@@ -13,6 +13,7 @@ import {
 } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, spacing, typography } from "@/theme";
+import { canViewReservation } from "@/utils/authorization";
 import { formatDateTime } from "@/utils/date";
 import { getResourceReservationSnapshot } from "@/utils/reservations";
 
@@ -21,7 +22,7 @@ interface ResourceDetailScreenProps {
 }
 
 export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) {
-  const { resources, reservations } = useReservationStore();
+  const { resources, reservations, currentUser } = useReservationStore();
   const resource = resources.find((item) => item.id === resourceId);
 
   if (!resource) {
@@ -40,6 +41,7 @@ export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) 
   const computedStatus = snapshot.resourceStatus;
   const relatedReservations = reservations
     .filter((reservation) => reservation.resourceId === resource.id)
+    .filter((reservation) => canViewReservation(currentUser, reservation))
     .slice(0, 3);
   const nextReservation = snapshot.nextReservation;
 

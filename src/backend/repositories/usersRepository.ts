@@ -33,16 +33,15 @@ export async function upsertUser(user: User) {
   return mapUserRow(data);
 }
 
-export async function linkUserToAuth(userId: string, authUserId: string) {
+export async function linkUserToAuth(userId: string, _authUserId?: string) {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("users")
-    .update({ auth_user_id: authUserId })
-    .eq("id", userId)
-    .select("*")
-    .single();
+  const { data, error } = await supabase.rpc("link_current_user_auth", {
+    p_user_id: userId,
+  });
 
-  if (error || !data) {
+  const resolvedRow = Array.isArray(data) ? data[0] : data;
+
+  if (error || !resolvedRow) {
     throw new Error(
       getFriendlyRepositoryErrorMessage(
         error,
@@ -51,5 +50,5 @@ export async function linkUserToAuth(userId: string, authUserId: string) {
     );
   }
 
-  return mapUserRow(data);
+  return mapUserRow(resolvedRow);
 }

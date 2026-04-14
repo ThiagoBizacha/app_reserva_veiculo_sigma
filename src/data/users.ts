@@ -38,7 +38,7 @@ export const users: User[] = [
     gestorVeiculo: true,
     matricula: "SIG-10214",
     matriz: "Belo Horizonte",
-    role: "Gestor",
+    role: "Operação",
     area: "Facilities e Frota",
     areaDepartamento: "Facilities e Frota",
     centroCusto: "CC-FeO-102",
@@ -53,7 +53,7 @@ export const users: User[] = [
     cnhDataUltimaValidacao: "2026-03-21T10:00:00.000Z",
     cnhAnexo: "docs/cnh/marina-souto.pdf",
     termosPaytrack: true,
-    observacao: "Gestora responsável pela aprovação de reservas de veículos.",
+    observacao: "Responsável pela coordenação operacional da frota e suporte às reservas.",
   },
   {
     id: "usr-03",

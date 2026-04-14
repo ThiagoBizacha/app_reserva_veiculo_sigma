@@ -69,6 +69,26 @@ export async function upsertReservation(
   return data;
 }
 
+export async function cancelOwnReservation(reservationId: string) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.rpc("cancel_own_reservation", {
+    p_reservation_id: reservationId,
+  });
+
+  const resolvedRow = Array.isArray(data) ? data[0] : data;
+
+  if (error || !resolvedRow) {
+    throw new Error(
+      getFriendlyRepositoryErrorMessage(
+        error,
+        "Nao foi possivel cancelar a reserva do solicitante no backend."
+      )
+    );
+  }
+
+  return resolvedRow;
+}
+
 export async function appendReservationHistory(
   reservationId: string,
   historyItem: ReservationHistoryItem
@@ -87,4 +107,3 @@ export async function appendReservationHistory(
     );
   }
 }
-

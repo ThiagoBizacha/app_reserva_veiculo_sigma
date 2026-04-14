@@ -22,13 +22,17 @@ import type {
 } from "@/types";
 import {
   type CalendarDayState,
-  getActionableReservationsForUser,
   getCurrentResourceStatus,
   getFleetSummary,
   getResourceAvailabilityForDate,
   getResourceReservations,
   getReservationsForResourceDay,
 } from "@/utils/reservations";
+import {
+  getUserPermissions,
+  getVisibleActionableReservations,
+  type UserPermissions,
+} from "@/utils/authorization";
 import { colors, radius, spacing, typography } from "@/theme";
 import { getBackendConfig } from "@/backend/config";
 import { fetchRemoteAppState, subscribeToRemoteAppState } from "@/backend/appState";
@@ -54,6 +58,7 @@ interface ReservationStoreValue {
   resources: Resource[];
   reservations: Reservation[];
   currentUser: User;
+  currentUserPermissions: UserPermissions;
   currentUserId: string;
   currentUserName: string;
   isBootstrapping: boolean;
@@ -161,6 +166,7 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
   const authEmail = normalizeEmail(authUser?.email);
   const currentUser =
     users.find((user) => userMatchesAuthIdentity(user, authUser?.id, authEmail)) ?? EMPTY_USER;
+  const currentUserPermissions = getUserPermissions(currentUser);
   const currentUserId = currentUser.id;
   const currentUserName = currentUser.name || authUser?.email || "Usuario";
   const hasLinkedCurrentUser = currentUser.id !== EMPTY_USER.id;
@@ -446,10 +452,11 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       resources,
       reservations,
       currentUser,
+      currentUserPermissions,
       currentUserId,
       currentUserName,
     }),
-    [currentUser, currentUserId, currentUserName, reservations, resources, users]
+    [currentUser, currentUserId, currentUserName, currentUserPermissions, reservations, resources, users]
   );
 
   const runMutation = useCallback(
@@ -545,8 +552,8 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
   );
 
   const getActionableReservations = useCallback(
-    () => getActionableReservationsForUser(reservations, currentUserId),
-    [currentUserId, reservations]
+    () => getVisibleActionableReservations(currentUser, reservations),
+    [currentUser, reservations]
   );
 
   const getSummary = useCallback(
@@ -617,6 +624,7 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       resources,
       reservations,
       currentUser,
+      currentUserPermissions,
       currentUserId,
       currentUserName,
       isBootstrapping,
@@ -653,6 +661,7 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
       createUser,
       createVehicle,
       currentUser,
+      currentUserPermissions,
       currentUserId,
       currentUserName,
       exportReservationsReport,

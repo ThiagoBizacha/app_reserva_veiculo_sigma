@@ -13,15 +13,12 @@ export interface NewVehiclePayload {
   year: string;
   vehicleCategory: VehicleCategory;
   currentMileage: string;
-  location?: string;
-  responsible?: string;
   description: string;
   rentalCompany?: string;
   vehicleDocumentAttachment?: string;
   nextMaintenanceDate?: string;
   nextMaintenanceMileage?: string;
   observation?: string;
-  requiresApproval?: boolean;
 }
 
 export interface Resource {
@@ -46,11 +43,8 @@ export interface Resource {
   lastMaintenanceMileage?: string;
   nextMaintenanceMileage?: string;
   observation?: string;
-  location: string;
   capacity?: string;
   description: string;
-  responsible?: string;
-  requiresApproval: boolean;
   imageHint: string;
   nextAvailableAt?: string;
   tags: string[];

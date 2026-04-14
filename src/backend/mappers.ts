@@ -120,11 +120,8 @@ export function mapResourceRow(
     lastMaintenanceMileage: row.last_maintenance_mileage ?? undefined,
     nextMaintenanceMileage: row.next_maintenance_mileage ?? undefined,
     observation: row.observation ?? undefined,
-    location: row.location,
     capacity: row.capacity ?? undefined,
     description: row.description,
-    responsible: row.responsible ?? undefined,
-    requiresApproval: row.requires_approval,
     imageHint: row.image_hint,
     nextAvailableAt:
       activeMaintenance?.expected_end_at ??
@@ -234,11 +231,8 @@ export function mapResourceToInsert(resource: Resource): ResourceInsert {
     last_maintenance_mileage: resource.lastMaintenanceMileage ?? null,
     next_maintenance_mileage: resource.nextMaintenanceMileage ?? null,
     observation: resource.observation ?? null,
-    location: resource.location,
     capacity: resource.capacity ?? null,
     description: resource.description,
-    responsible: resource.responsible ?? null,
-    requires_approval: resource.requiresApproval,
     image_hint: resource.imageHint,
     next_available_at: resource.nextAvailableAt ?? null,
     tags: resource.tags ?? [],

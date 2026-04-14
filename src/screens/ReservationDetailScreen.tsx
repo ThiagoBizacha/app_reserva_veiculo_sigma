@@ -14,6 +14,11 @@ import {
 } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, spacing, typography } from "@/theme";
+import {
+  canCancelReservation,
+  canExecuteReservationOperation,
+  canViewReservation,
+} from "@/utils/authorization";
 import { formatDateTime } from "@/utils/date";
 import {
   formatMileageValue,
@@ -29,7 +34,8 @@ interface ReservationDetailScreenProps {
 }
 
 export function ReservationDetailScreen({ reservationId }: ReservationDetailScreenProps) {
-  const { reservations, resources, users, cancelReservation, isMutating } = useReservationStore();
+  const { reservations, resources, users, currentUser, cancelReservation, isMutating } =
+    useReservationStore();
   const [feedback, setFeedback] = useState<string | null>(null);
   const reservation = reservations.find((item) => item.id === reservationId);
 
@@ -52,10 +58,27 @@ export function ReservationDetailScreen({ reservationId }: ReservationDetailScre
     );
   }
 
+  if (!canViewReservation(currentUser, reservation)) {
+    return (
+      <ScreenContainer>
+        <EmptyState
+          icon="lock"
+          title="Acesso restrito"
+          description="Esta reserva não está disponível para o seu perfil."
+        />
+      </ScreenContainer>
+    );
+  }
+
   const resource = resources.find((item) => item.id === reservation.resourceId);
   const requester = users.find((item) => item.id === reservation.userId);
-  const canStartCheckIn = reservation.status === "Reservado" && isScheduledReservationActive(reservation);
-  const canCancelReservation = reservation.status === "Reservado" && isScheduledReservationActive(reservation);
+  const canStartCheckIn =
+    reservation.status === "Reservado" &&
+    isScheduledReservationActive(reservation) &&
+    canExecuteReservationOperation(currentUser, reservation);
+  const canStartCheckOut =
+    reservation.status === "Em uso" && canExecuteReservationOperation(currentUser, reservation);
+  const canCancelCurrentReservation = canCancelReservation(currentUser, reservation);
 
   const handleCancelReservation = async () => {
     const result = await cancelReservation(reservation.id);
@@ -111,11 +134,11 @@ export function ReservationDetailScreen({ reservationId }: ReservationDetailScre
         <PrimaryButton label="Abrir vistoria de saída" onPress={() => openOperation("checkin")} />
       ) : null}
 
-      {reservation.status === "Em uso" ? (
+      {canStartCheckOut ? (
         <PrimaryButton label="Registrar devolução" onPress={() => openOperation("checkout")} />
       ) : null}
 
-      {canCancelReservation ? (
+      {canCancelCurrentReservation ? (
         <SecondaryButton
           label={isMutating ? "Cancelando..." : "Cancelar reserva"}
           onPress={() => {

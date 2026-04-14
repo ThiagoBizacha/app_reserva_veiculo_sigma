@@ -8,6 +8,7 @@ import { DriverLicensePreviewModal, ScreenContainer } from "@/components";
 import { useAuthSession } from "@/hooks/useAuthSession";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
+import { getUserPermissions } from "@/utils/authorization";
 import type { User } from "@/types";
 
 export function HomeScreen() {
@@ -26,7 +27,8 @@ export function HomeScreen() {
   const requesterDepartment = currentUser.areaDepartamento;
   const requesterCostCenter = currentUser.centroCusto;
   const requesterManagerName =
-    users.find((user) => user.id === currentUser.gestorId)?.fullName ?? "Gestor não definido";
+    users.find((user) => user.id === currentUser.gestorId)?.fullName ?? "Superior não definido";
+  const currentUserPermissions = getUserPermissions(currentUser);
   const normalizedCnhStatus = currentUser.cnhStatus
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -63,7 +65,7 @@ export function HomeScreen() {
       icon: "bar-chart-2",
       route: "/(tabs)/admin",
     },
-  ];
+  ].filter((item) => item.route !== "/(tabs)/admin" || currentUserPermissions.canAccessAdminPanel);
 
   return (
     <ScreenContainer>
@@ -113,7 +115,7 @@ export function HomeScreen() {
             </View>
 
             <Text style={styles.profileMeta}>
-              Centro de custo: {requesterCostCenter} | Gestor: {requesterManagerName}
+              Centro de custo: {requesterCostCenter} | Superior: {requesterManagerName}
             </Text>
 
             <View style={styles.licenseInline}>

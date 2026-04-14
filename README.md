@@ -3,10 +3,11 @@
 Aplicativo interno em React Native + Expo para reserva corporativa de veiculos.
 
 
-As etapas `B03` e `B01` agora estao estruturadas no codigo:
+As etapas `B03`, `B01` e `B02` agora estao estruturadas no codigo:
 
 - `B03`: backend persistente e multiusuario com Supabase como fonte unica de verdade
 - `B01`: autenticacao real com Supabase Auth, sessao persistida, rotas protegidas e troca obrigatoria da senha temporaria no primeiro acesso
+- `B02`: autorizacao por perfil e ownership com RLS no Supabase para `Solicitante`, `Operacao` e `Administrador`
 
 ## Estado atual
 
@@ -17,8 +18,15 @@ O app agora foi estruturado para:
 - exigir sessao autenticada para entrar no app;
 - restaurar a sessao ao reabrir o app;
 - obrigar a troca da senha temporaria no primeiro login;
+- restringir leitura e escrita por perfil e ownership no backend;
 - persistir criacao de reserva, cancelamento, check-in e check-out no backend;
 - refletir a mesma fonte de verdade em Agenda, Minhas Reservas, Frota, Painel e Detalhes.
+
+Perfis suportados nesta fase:
+
+- `Solicitante`
+- `Operacao`
+- `Administrador`
 
 `src/data/*` continua no repositorio apenas como insumo de seed e bootstrap de usuarios de teste. Nao e mais fluxo operacional do app.
 
@@ -64,16 +72,28 @@ Crie um projeto no Supabase e copie:
 
 ### 2. Aplicar as migrations
 
-Execute as duas migrations no Supabase:
+Execute as migrations na ordem abaixo no Supabase:
 
 1. [supabase/migrations/202604130001_b03_backend_persistente.sql](/c:/Users/ThiagoBizacha/projects/app_reserva_veiculo_sigma/supabase/migrations/202604130001_b03_backend_persistente.sql:1)
 2. [supabase/migrations/202604130002_b01_auth_real.sql](/c:/Users/ThiagoBizacha/projects/app_reserva_veiculo_sigma/supabase/migrations/202604130002_b01_auth_real.sql:1)
+3. [supabase/migrations/202604140003_b02_roles_iniciais.sql](/c:/Users/ThiagoBizacha/projects/app_reserva_veiculo_sigma/supabase/migrations/202604140003_b02_roles_iniciais.sql:1)
+4. [supabase/migrations/202604140004_drop_campos_obsoletos_resources.sql](/c:/Users/ThiagoBizacha/projects/app_reserva_veiculo_sigma/supabase/migrations/202604140004_drop_campos_obsoletos_resources.sql:1)
+5. [supabase/migrations/202604140005_b02_rls_por_papel_e_ownership.sql](/c:/Users/ThiagoBizacha/projects/app_reserva_veiculo_sigma/supabase/migrations/202604140005_b02_rls_por_papel_e_ownership.sql:1)
 
-A primeira cria o modelo persistente. A segunda:
+Resumo:
+
+- `202604130001`: cria o modelo persistente principal;
+- `202604130002`: adiciona `auth_user_id` e fecha acesso anonimo;
+- `202604140003`: remove `Gestor` como papel e padroniza `Solicitante`, `Operacao` e `Administrador`;
+- `202604140004`: remove campos obsoletos de `public.resources`;
+- `202604140005`: aplica RLS real por perfil e ownership, alem das RPCs seguras de vinculacao e cancelamento do solicitante.
+
+O bloco de autenticacao e autorizacao:
 
 - adiciona `auth_user_id` em `public.users`;
 - fecha o acesso anonimo;
-- deixa as tabelas operacionais acessiveis apenas por usuarios autenticados.
+- deixa as tabelas operacionais acessiveis apenas por usuarios autenticados;
+- restringe leitura e escrita por ownership e papel.
 
 ### 3. Configurar variaveis de ambiente
 
@@ -219,9 +239,9 @@ Checklist automatizado desta etapa:
 
 - `npm run typecheck`
 
-Checklist manual recomendado para homologacao de `B01` + `B03`:
+Checklist manual recomendado para homologacao de `B03` + `B01` + `B02`:
 
-1. Aplicar as duas migrations.
+1. Aplicar as migrations do backend na ordem documentada.
 2. Rodar `npm run seed:supabase`.
 3. Rodar `npm run auth:provision:supabase`.
 4. Abrir o app sem sessao e confirmar que a tela inicial e o login.
@@ -236,25 +256,31 @@ Checklist manual recomendado para homologacao de `B01` + `B03`:
 13. Fazer check-out.
 14. Confirmar status `Concluida`.
 15. Fazer logout e confirmar retorno para a tela de login.
+16. Entrar com `Solicitante` e confirmar que ele ve apenas as proprias reservas e nao faz check-in/check-out.
+17. Entrar com `Operacao` e confirmar que ele faz check-in/check-out e ve operacao global.
+18. Entrar com `Administrador` e confirmar acesso a gestao completa.
 
 ## Decisoes tecnicas
 
 - `src/hooks/useAuthSession.tsx` concentra sessao, `signInWithPassword`, `signOut`, restauracao e observacao de mudancas de auth.
 - `src/hooks/useAuthSession.tsx` tambem concentra a obrigacao de troca da senha temporaria e a atualizacao da senha definitiva via `Supabase Auth`.
 - `src/hooks/useReservationStore.tsx` continua sendo a API de consumo das telas, mas agora depende da sessao autenticada para sincronizar o backend.
+- `src/hooks/useReservationStore.tsx` tambem expoe `currentUserPermissions` e filtra acoes visiveis por papel.
 - O usuario corrente deixou de vir de `EXPO_PUBLIC_DEFAULT_USER_ID`. O app resolve o colaborador pelo `auth_user_id`, com fallback por email para vinculo inicial.
 - O app mobile persiste a sessao via AsyncStorage. Na web, a sessao usa o storage do navegador.
-- O banco agora exige usuario autenticado para acessar as tabelas operacionais. Ownership por perfil e recurso fica para `B02`.
+- O banco agora exige usuario autenticado para acessar as tabelas operacionais e aplica RLS por perfil e ownership.
+- O cancelamento do `Solicitante` passa por `cancel_own_reservation`, evitando `update` amplo de reservas pelo dono.
 
 ## Limites atuais
 
-- `B02` ainda nao foi implementado. As politicas RLS estao fechadas para anonimo, mas ainda nao restringem por papel ou ownership.
 - O app nao cria usuarios no Supabase Auth pelo frontend. O provisionamento inicial e administrativo ainda acontece por script local com chave secreta.
 - O fluxo automatizado de recuperacao de senha ainda nao entrou.
+- `B05`, `B06`, `B07` e `B08` ainda faltam para fechar o go-live com risco controlado.
 
 ## Proximos passos
 
-- `B02` autorizacao por perfil e ownership
-- endurecer politicas RLS por usuario, papel e reserva
+- `B05` regras operacionais minimas de elegibilidade
+- `B06` tratamento real de atraso e SLA
+- `B07` auditoria e historico persistido
+- `B08` testes automatizados das regras centrais
 - evoluir onboarding administrativo de usuarios
-- adicionar fluxo real de redefinicao de senha

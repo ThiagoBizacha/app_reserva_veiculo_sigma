@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-
 import { EmptyState, PageHeader, ScreenContainer, VehicleDocumentPreviewModal } from "@/components";
 import { useReservationStore } from "@/hooks/useReservationStore";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
+import { canViewReservation } from "@/utils/authorization";
 import { formatDate } from "@/utils/date";
 import {
   getResourceReservationSnapshot,
@@ -30,7 +31,7 @@ const statusMeta: Record<ResourceStatus, { color: string; action: string }> = {
 };
 
 export function ResourcesScreen() {
-  const { resources, reservations } = useReservationStore();
+  const { resources, reservations, currentUser } = useReservationStore();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FleetFilter>("Todos");
   const [documentResource, setDocumentResource] = useState<Resource | null>(null);
@@ -73,7 +74,6 @@ export function ResourcesScreen() {
       !query ||
       resource.name.toLowerCase().includes(query) ||
       resource.code.toLowerCase().includes(query) ||
-      resource.location.toLowerCase().includes(query) ||
       resource.plate?.toLowerCase().includes(query) ||
       resource.model?.toLowerCase().includes(query) ||
       resource.brand?.toLowerCase().includes(query) ||
@@ -94,12 +94,36 @@ export function ResourcesScreen() {
   };
 
   const handleAction = (status: ResourceStatus, resourceId: string, reservationId?: string) => {
-    if ((status === "Em uso" || status === "Reservado") && reservationId) {
-      router.push({ pathname: "/reservation/[id]", params: { id: reservationId } });
+    const reservation = reservationId
+      ? reservations.find((item) => item.id === reservationId)
+      : undefined;
+
+    if (
+      (status === "Em uso" || status === "Reservado") &&
+      reservation &&
+      canViewReservation(currentUser, reservation)
+    ) {
+      router.push({ pathname: "/reservation/[id]", params: { id: reservation.id } });
       return;
     }
 
     router.push({ pathname: "/(tabs)/agenda", params: { resourceId } });
+  };
+
+  const getPrimaryActionLabel = (status: ResourceStatus, reservationId?: string) => {
+    const reservation = reservationId
+      ? reservations.find((item) => item.id === reservationId)
+      : undefined;
+
+    if (
+      (status === "Reservado" || status === "Em uso") &&
+      reservation &&
+      !canViewReservation(currentUser, reservation)
+    ) {
+      return "Ver agenda";
+    }
+
+    return statusMeta[status].action;
   };
 
   const openDetail = (resourceId: string) => {
@@ -311,7 +335,12 @@ export function ResourcesScreen() {
                   )
                 }
               >
-                <Text style={styles.actionButtonText}>{statusMeta[computedStatus].action}</Text>
+                <Text style={styles.actionButtonText}>
+                  {getPrimaryActionLabel(
+                    computedStatus,
+                    currentReservation?.id ?? nextReservation?.id
+                  )}
+                </Text>
               </Pressable>
             </View>
           ))
