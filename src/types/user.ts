@@ -4,6 +4,7 @@ export type UserRole = "Solicitante" | "Operação" | "Administrador";
 
 export interface NewUserPayload {
   fullName: string;
+  username: string;
   cpf: string;
   matricula: string;
   role: UserRole;
@@ -25,6 +26,7 @@ export interface User {
   userId: string;
   authUserId?: string;
   fullName: string;
+  username: string;
   cpf: string;
   gestorVeiculo: boolean;
   matricula: string;

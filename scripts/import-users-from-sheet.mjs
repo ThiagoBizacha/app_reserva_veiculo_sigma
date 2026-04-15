@@ -2,6 +2,10 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { createClient } from "@supabase/supabase-js";
+import {
+  buildUniqueUsername,
+  normalizeUsernameInput,
+} from "./lib/auth-identity.mjs";
 
 const rootDir = process.cwd();
 
@@ -277,6 +281,11 @@ function runSpreadsheetReader(filePath, sheetName) {
   const result = spawnSync("python", commandArgs, {
     cwd: rootDir,
     encoding: "utf8",
+    env: {
+      ...process.env,
+      PYTHONIOENCODING: "utf-8",
+      PYTHONUTF8: "1",
+    },
   });
 
   if (result.error) {
@@ -305,7 +314,7 @@ function runSpreadsheetReader(filePath, sheetName) {
 async function loadExistingUsers() {
   const { data, error } = await supabase
     .from("users")
-    .select("id, user_id, full_name, email, matricula, role, auth_user_id")
+    .select("id, user_id, full_name, username, email, matricula, role, auth_user_id")
     .order("full_name");
 
   if (error) {
@@ -318,10 +327,12 @@ async function loadExistingUsers() {
 function buildExistingIndexes(existingUsers) {
   const usersByEmail = new Map();
   const usersByMatricula = new Map();
+  const usersByUsername = new Map();
 
   existingUsers.forEach((user) => {
     const normalizedEmail = normalizeEmail(user.email);
     const normalizedMatricula = normalizeComparable(user.matricula);
+    const normalizedUsername = normalizeUsernameInput(user.username);
 
     if (normalizedEmail) {
       usersByEmail.set(normalizedEmail, user);
@@ -330,15 +341,20 @@ function buildExistingIndexes(existingUsers) {
     if (normalizedMatricula) {
       usersByMatricula.set(normalizedMatricula, user);
     }
+
+    if (normalizedUsername) {
+      usersByUsername.set(normalizedUsername, user);
+    }
   });
 
-  return { usersByEmail, usersByMatricula };
+  return { usersByEmail, usersByMatricula, usersByUsername };
 }
 
 function prepareImportRows(parsedRows, existingUsers) {
-  const { usersByEmail, usersByMatricula } = buildExistingIndexes(existingUsers);
+  const { usersByEmail, usersByMatricula, usersByUsername } = buildExistingIndexes(existingUsers);
   const seenEmails = new Set();
   const seenMatriculas = new Set();
+  const plannedUsernames = new Set(existingUsers.map((user) => user.username));
   const readyRecords = [];
   const skippedRows = [];
   const warnings = [];
@@ -350,6 +366,7 @@ function prepareImportRows(parsedRows, existingUsers) {
     const fullName = normalizeText(row.NomeCompleto);
     const email = normalizeEmail(row.EmailCorporativo);
     const matricula = normalizeText(row.Matricula).toUpperCase();
+    const preferredUsername = normalizeUsernameInput(row.Username || row.UserName || "");
     const rowWarnings = [];
     const rowErrors = [];
 
@@ -357,8 +374,8 @@ function prepareImportRows(parsedRows, existingUsers) {
       rowErrors.push("nome_completo_ausente");
     }
 
-    if (!email || !isValidEmail(email)) {
-      rowErrors.push("email_invalido_ou_ausente");
+    if (email && !isValidEmail(email)) {
+      rowErrors.push("email_invalido");
     }
 
     if (!matricula || isBlankLike(matricula)) {
@@ -387,8 +404,9 @@ function prepareImportRows(parsedRows, existingUsers) {
     seenEmails.add(email);
     seenMatriculas.add(matricula);
 
-    const matchedByEmail = usersByEmail.get(email);
+    const matchedByEmail = email ? usersByEmail.get(email) : null;
     const matchedByMatricula = usersByMatricula.get(normalizeComparable(matricula));
+    const matchedByUsername = preferredUsername ? usersByUsername.get(preferredUsername) : null;
 
     if (
       matchedByEmail &&
@@ -405,7 +423,22 @@ function prepareImportRows(parsedRows, existingUsers) {
       return;
     }
 
-    const existingUser = matchedByEmail ?? matchedByMatricula ?? null;
+    if (
+      matchedByUsername &&
+      matchedByMatricula &&
+      matchedByUsername.id !== matchedByMatricula.id
+    ) {
+      skippedRows.push({
+        rowNumber,
+        fullName,
+        email,
+        matricula,
+        reasons: ["conflito_username_e_matricula_apontam_para_usuarios_diferentes"],
+      });
+      return;
+    }
+
+    const existingUser = matchedByEmail ?? matchedByMatricula ?? matchedByUsername ?? null;
     const importedRole = normalizeRole(row.Perfil);
     const finalRole =
       existingUser?.role &&
@@ -428,11 +461,23 @@ function prepareImportRows(parsedRows, existingUsers) {
       rowWarnings.push(normalizedValidationDate.warning);
     }
 
+    if (existingUser?.username) {
+      plannedUsernames.delete(existingUser.username);
+    }
+
+    const resolvedUsername = buildUniqueUsername(
+      fullName,
+      plannedUsernames,
+      preferredUsername || existingUser?.username
+    );
+    plannedUsernames.add(resolvedUsername);
+
     const record = {
       id: existingUser?.id ?? buildStableImportId(email, matricula),
       user_id: existingUser?.user_id ?? existingUser?.id ?? buildStableImportId(email, matricula),
       auth_user_id: existingUser?.auth_user_id ?? null,
       full_name: fullName,
+      username: resolvedUsername,
       cpf: isBlankLike(row.CPF) ? null : normalizeText(row.CPF),
       gestor_veiculo:
         normalizeBoolean(row.Gestor_Veiculo) || finalRole === "Operação" || finalRole === "Administrador",
@@ -441,7 +486,7 @@ function prepareImportRows(parsedRows, existingUsers) {
       role: finalRole,
       area_departamento: normalizeText(row.AreaDepartamento),
       centro_custo: normalizeText(row.CentroCusto),
-      email,
+      email: email || null,
       telefone: normalizeText(row.Telefone),
       gestor_nome: isBlankLike(row.GestorNome) ? null : normalizeText(row.GestorNome),
       cnh_numero: isBlankLike(row.CNH_Numero) ? null : normalizeText(row.CNH_Numero).toUpperCase(),
@@ -461,6 +506,10 @@ function prepareImportRows(parsedRows, existingUsers) {
 
     if (!record.centro_custo) {
       rowWarnings.push("centro_custo_em_branco");
+    }
+
+    if (!email) {
+      rowWarnings.push("email_em_branco_login_por_username");
     }
 
     if (!record.telefone) {

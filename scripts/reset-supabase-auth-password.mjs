@@ -103,12 +103,17 @@ function parseArgs(argv) {
         result.password = value;
       }
 
+      if (key === "username") {
+        result.username = value;
+      }
+
       return result;
     },
     {
       list: false,
       forceChange: true,
       userId: "",
+      username: "",
       matricula: "",
       password: "",
     }
@@ -119,6 +124,7 @@ function printUsage() {
   console.log("Uso:");
   console.log("  npm run auth:reset:supabase -- --list");
   console.log("  npm run auth:reset:supabase -- --user=usr-01 --password=123456");
+  console.log("  npm run auth:reset:supabase -- --username=TBIZACHA --password=123456");
   console.log("  npm run auth:reset:supabase -- --matricula=SIG-20451 --password=123456");
   console.log(
     "  npm run auth:reset:supabase -- --user=usr-01 --password=123456 --no-force-change"
@@ -128,7 +134,7 @@ function printUsage() {
 async function loadPublicUsers() {
   const { data, error } = await supabase
     .from("users")
-    .select("id, full_name, matricula, auth_user_id, email")
+    .select("id, username, full_name, matricula, auth_user_id, email")
     .order("full_name");
 
   if (error) {
@@ -146,6 +152,12 @@ function findTargetUser(users) {
   if (args.userId) {
     return (
       users.find((user) => normalize(user.id) === normalize(args.userId)) ?? null
+    );
+  }
+
+  if (args.username) {
+    return (
+      users.find((user) => normalize(user.username) === normalize(args.username)) ?? null
     );
   }
 
@@ -192,6 +204,7 @@ async function resetPassword(targetUser) {
     ...currentMetadata,
     app_user_id: targetUser.id,
     full_name: targetUser.full_name,
+    username: targetUser.username,
     must_change_password: args.forceChange,
     temporary_password_assigned_at: args.forceChange ? new Date().toISOString() : null,
   };
@@ -206,7 +219,7 @@ async function resetPassword(targetUser) {
   }
 
   console.log("Senha resetada com sucesso.");
-  console.log(`Usuario: ${targetUser.id} | ${targetUser.full_name}`);
+  console.log(`Usuario: ${targetUser.id} | ${targetUser.username} | ${targetUser.full_name}`);
   console.log(`Matricula: ${targetUser.matricula}`);
   console.log(`Troca obrigatoria no proximo login: ${args.forceChange ? "sim" : "nao"}`);
 }
@@ -218,7 +231,7 @@ async function run() {
     console.log("Usuarios disponiveis para reset:");
     users.forEach((user) => {
       console.log(
-        `${user.id} | ${user.matricula} | ${user.full_name} | ${user.auth_user_id ? "auth-ok" : "sem-auth"}`
+        `${user.id} | ${user.username} | ${user.matricula} | ${user.full_name} | ${user.auth_user_id ? "auth-ok" : "sem-auth"}`
       );
     });
     return;
@@ -229,7 +242,7 @@ async function run() {
   if (!targetUser) {
     printUsage();
     throw new Error(
-      "Informe um usuario valido com --user=<id> ou --matricula=<matricula>."
+      "Informe um usuario valido com --user=<id>, --username=<username> ou --matricula=<matricula>."
     );
   }
 

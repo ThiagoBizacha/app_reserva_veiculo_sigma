@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { Session, User as SupabaseAuthUser } from "@supabase/supabase-js";
 import { getSupabaseClient, hasBackendConfig } from "@/backend/client";
+import { resolveAuthLoginIdentifier } from "@/backend/repositories/usersRepository";
 
 interface AuthCommandResult {
   success: boolean;
@@ -23,7 +24,7 @@ interface AuthSessionValue {
   isReady: boolean;
   isSubmitting: boolean;
   authError: string | null;
-  signInWithPassword: (email: string, password: string) => Promise<AuthCommandResult>;
+  signInWithPassword: (identifier: string, password: string) => Promise<AuthCommandResult>;
   updatePassword: (nextPassword: string, confirmation: string) => Promise<AuthCommandResult>;
   signOut: () => Promise<AuthCommandResult>;
   clearAuthError: () => void;
@@ -83,7 +84,7 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
   }, []);
 
   const signInWithPassword = useCallback(
-    async (email: string, password: string): Promise<AuthCommandResult> => {
+    async (identifier: string, password: string): Promise<AuthCommandResult> => {
       if (!hasBackendConfig()) {
         const message =
           "Backend nao configurado. Defina EXPO_PUBLIC_SUPABASE_URL e EXPO_PUBLIC_SUPABASE_ANON_KEY antes de autenticar.";
@@ -91,10 +92,10 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
         return { success: false, message };
       }
 
-      const normalizedEmail = email.trim().toLowerCase();
+      const normalizedIdentifier = identifier.trim();
 
-      if (!normalizedEmail || !password.trim()) {
-        const message = "Informe email corporativo e senha para entrar.";
+      if (!normalizedIdentifier || !password.trim()) {
+        const message = "Informe usuario ou email e senha para entrar.";
         setAuthError(message);
         return { success: false, message };
       }
@@ -104,8 +105,19 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 
       try {
         const supabase = getSupabaseClient();
+        let authLoginEmail = normalizedIdentifier.toLowerCase();
+
+        try {
+          const resolvedIdentity = await resolveAuthLoginIdentifier(normalizedIdentifier);
+          authLoginEmail = resolvedIdentity.authLoginEmail;
+        } catch (error) {
+          if (!normalizedIdentifier.includes("@")) {
+            throw error;
+          }
+        }
+
         const { error } = await supabase.auth.signInWithPassword({
-          email: normalizedEmail,
+          email: authLoginEmail,
           password,
         });
 

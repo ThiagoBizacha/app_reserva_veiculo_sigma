@@ -153,6 +153,9 @@ def read_csv_file(file_path: Path) -> dict:
 
 
 def main() -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--file", required=True)
     parser.add_argument("--sheet")

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
+import { buildAuthLoginEmail, normalizeUsernameInput } from "./lib/auth-identity.mjs";
 
 const rootDir = process.cwd();
 
@@ -77,10 +78,6 @@ function resolveTemporaryPassword() {
   return process.env.SUPABASE_AUTH_TEMP_PASSWORD?.trim();
 }
 
-function normalizeEmail(email) {
-  return email?.trim().toLowerCase() ?? "";
-}
-
 async function listExistingAuthUsers() {
   const { data, error } = await supabase.auth.admin.listUsers({
     page: 1,
@@ -97,7 +94,7 @@ async function listExistingAuthUsers() {
 async function loadPublicUsers() {
   const { data, error } = await supabase
     .from("users")
-    .select("id, full_name, email, auth_user_id")
+    .select("id, full_name, username, email, auth_user_id")
     .order("full_name");
 
   if (error) {
@@ -108,10 +105,10 @@ async function loadPublicUsers() {
 }
 
 async function createAuthUser(user, password) {
-  const loginEmail = normalizeEmail(user.email);
+  const loginEmail = buildAuthLoginEmail(user.email, user.username);
 
   if (!loginEmail) {
-    throw new Error(`Usuario ${user.id} nao possui email para provisionamento.`);
+    throw new Error(`Usuario ${user.id} nao possui username ou email para provisionamento.`);
   }
 
   const { data, error } = await supabase.auth.admin.createUser({
@@ -121,6 +118,7 @@ async function createAuthUser(user, password) {
     user_metadata: {
       app_user_id: user.id,
       full_name: user.full_name,
+      username: normalizeUsernameInput(user.username),
       must_change_password: true,
       temporary_password_assigned_at: new Date().toISOString(),
     },
@@ -133,7 +131,7 @@ async function createAuthUser(user, password) {
   return data.user;
 }
 
-async function syncExistingAuthUser(publicUser, authUser) {
+async function syncExistingAuthUser(publicUser, authUser, loginEmail) {
   const currentMetadata =
     authUser.user_metadata && typeof authUser.user_metadata === "object"
       ? authUser.user_metadata
@@ -143,6 +141,7 @@ async function syncExistingAuthUser(publicUser, authUser) {
     ...currentMetadata,
     app_user_id: publicUser.id,
     full_name: publicUser.full_name,
+    username: normalizeUsernameInput(publicUser.username),
     must_change_password:
       currentMetadata.must_change_password === false
         ? false
@@ -150,8 +149,10 @@ async function syncExistingAuthUser(publicUser, authUser) {
   };
 
   const requiresUpdate =
+    String(authUser.email ?? "").trim().toLowerCase() !== loginEmail ||
     currentMetadata.app_user_id !== nextMetadata.app_user_id ||
     currentMetadata.full_name !== nextMetadata.full_name ||
+    currentMetadata.username !== nextMetadata.username ||
     currentMetadata.must_change_password !== nextMetadata.must_change_password;
 
   if (!requiresUpdate) {
@@ -159,6 +160,8 @@ async function syncExistingAuthUser(publicUser, authUser) {
   }
 
   const { data, error } = await supabase.auth.admin.updateUserById(authUser.id, {
+    email: loginEmail,
+    email_confirm: true,
     user_metadata: nextMetadata,
   });
 
@@ -188,25 +191,30 @@ async function run() {
 
   const existingByEmail = new Map(
     existingAuthUsers
-      .filter((user) => normalizeEmail(user.email))
-      .map((user) => [normalizeEmail(user.email), user])
+      .filter((user) => String(user.email ?? "").trim().toLowerCase())
+      .map((user) => [String(user.email ?? "").trim().toLowerCase(), user])
   );
+  const existingById = new Map(existingAuthUsers.map((user) => [user.id, user]));
 
   const provisionedAccounts = [];
 
   for (const publicUser of publicUsers) {
-    const loginEmail = normalizeEmail(publicUser.email);
+    const loginEmail = buildAuthLoginEmail(publicUser.email, publicUser.username);
 
     if (!loginEmail) {
       continue;
     }
 
+    const linkedAuthUser = publicUser.auth_user_id ? existingById.get(publicUser.auth_user_id) : null;
     const existingAuthUser = existingByEmail.get(loginEmail);
-    const authUser = existingAuthUser
-      ? await syncExistingAuthUser(publicUser, existingAuthUser)
+    const authUser = linkedAuthUser
+      ? await syncExistingAuthUser(publicUser, linkedAuthUser, loginEmail)
+      : existingAuthUser
+        ? await syncExistingAuthUser(publicUser, existingAuthUser, loginEmail)
       : await createAuthUser(publicUser, temporaryPassword);
 
     existingByEmail.set(loginEmail, authUser);
+    existingById.set(authUser.id, authUser);
 
     if (publicUser.auth_user_id !== authUser.id) {
       await linkPublicUserToAuth(publicUser.id, authUser.id);
@@ -215,6 +223,7 @@ async function run() {
     provisionedAccounts.push({
       userId: publicUser.id,
       fullName: publicUser.full_name,
+      username: publicUser.username,
       loginEmail,
       authUserId: authUser.id,
     });
@@ -226,7 +235,7 @@ async function run() {
   console.log("");
 
   provisionedAccounts.forEach((account) => {
-    console.log(`${account.userId} | ${account.loginEmail} | ${account.fullName}`);
+    console.log(`${account.userId} | ${account.username} | ${account.loginEmail} | ${account.fullName}`);
   });
 }
 

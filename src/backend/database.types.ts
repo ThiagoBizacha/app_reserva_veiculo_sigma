@@ -270,7 +270,7 @@ export interface Database {
           cnh_status: string;
           cpf: string | null;
           created_at: string;
-          email: string;
+          email: string | null;
           full_name: string;
           gestor_nome: string | null;
           gestor_veiculo: boolean;
@@ -282,6 +282,7 @@ export interface Database {
           telefone: string;
           termos_paytrack: boolean;
           updated_at: string;
+          username: string;
           user_id: string;
         };
         Insert: {
@@ -295,7 +296,7 @@ export interface Database {
           cnh_status: string;
           cpf?: string | null;
           created_at?: string;
-          email: string;
+          email?: string | null;
           full_name: string;
           gestor_nome?: string | null;
           gestor_veiculo?: boolean;
@@ -307,6 +308,7 @@ export interface Database {
           telefone: string;
           termos_paytrack?: boolean;
           updated_at?: string;
+          username: string;
           user_id: string;
         };
         Update: Partial<Database["public"]["Tables"]["users"]["Insert"]>;
@@ -326,6 +328,16 @@ export interface Database {
       current_auth_email: {
         Args: Record<PropertyKey, never>;
         Returns: string;
+      };
+      resolve_auth_login_identifier: {
+        Args: {
+          p_identifier: string;
+        };
+        Returns: {
+          auth_login_email: string;
+          matched_user_id: string;
+          username: string;
+        }[];
       };
       cancel_own_reservation: {
         Args: {

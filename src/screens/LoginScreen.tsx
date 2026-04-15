@@ -62,7 +62,7 @@ export function LoginScreen() {
   const { height, width } = useWindowDimensions();
   const backendConfig = getBackendConfig();
   const { authError, clearAuthError, isSubmitting, signInWithPassword } = useAuthSession();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const isCompact = height <= 780;
@@ -73,7 +73,7 @@ export function LoginScreen() {
 
   const handleSignIn = async () => {
     clearAuthError();
-    await signInWithPassword(email, password);
+    await signInWithPassword(identifier, password);
   };
 
   return (
@@ -106,15 +106,15 @@ export function LoginScreen() {
               <Text style={[styles.title, isShort && styles.titleCompact]}>Bem-vindo</Text>
               <View style={[styles.formBlock, isCompact && styles.formBlockCompact]}>
                 <View style={styles.labelBlock}>
-                  <Text style={styles.label}>Email corporativo</Text>
+                  <Text style={styles.label}>Usuario ou email</Text>
                   <LoginField
                     compact={isCompact}
-                    icon="mail"
-                    placeholder="nome@sigma.local"
-                    value={email}
+                    icon="user"
+                    placeholder="TBIZACHA ou nome@empresa.com"
+                    value={identifier}
                     onChangeText={(value) => {
                       clearAuthError();
-                      setEmail(value);
+                      setIdentifier(value);
                     }}
                   />
                 </View>

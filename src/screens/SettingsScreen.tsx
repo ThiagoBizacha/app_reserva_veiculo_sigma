@@ -55,6 +55,7 @@ const emptyVehicleForm: NewVehiclePayload = {
 function buildInitialUserForm(matriz: string, gestorNome?: string): NewUserPayload {
   return {
     fullName: "",
+    username: "",
     cpf: "",
     matricula: "",
     role: "Solicitante",
@@ -94,6 +95,7 @@ function mapVehicleToForm(resource: Resource): NewVehiclePayload {
 function mapUserToForm(user: User, users: User[]): NewUserPayload {
   return {
     fullName: user.fullName,
+    username: user.username,
     cpf: user.cpf,
     matricula: user.matricula,
     role: user.role,
@@ -972,6 +974,14 @@ export function SettingsScreen() {
             value={userForm.fullName}
             onChangeText={(value) => updateUserField("fullName", value)}
           />
+          <FormField
+            label="Usuario de login"
+            placeholder="Ex.: ASILVA"
+            value={userForm.username}
+            onChangeText={(value) => updateUserField("username", value.toUpperCase())}
+            helper="Opcional. Se ficar em branco, o sistema gera automaticamente."
+            autoCapitalize="characters"
+          />
           <View style={styles.row}>
             <View style={styles.column}>
               <FormField
@@ -1022,6 +1032,7 @@ export function SettingsScreen() {
                 value={userForm.email}
                 onChangeText={(value) => updateUserField("email", value)}
                 autoCapitalize="none"
+                helper="Opcional. Se ficar em branco, o login usa apenas o usuario."
               />
             </View>
             <View style={styles.column}>

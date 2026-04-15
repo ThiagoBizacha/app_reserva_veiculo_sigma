@@ -33,6 +33,25 @@ export async function upsertUser(user: User) {
   return mapUserRow(data);
 }
 
+export async function resolveAuthLoginIdentifier(identifier: string) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.rpc("resolve_auth_login_identifier", {
+    p_identifier: identifier,
+  });
+
+  const resolvedRow = Array.isArray(data) ? data[0] : null;
+
+  if (error || !resolvedRow?.auth_login_email) {
+    throw new Error("Nao foi possivel localizar um usuario com o identificador informado.");
+  }
+
+  return {
+    authLoginEmail: resolvedRow.auth_login_email,
+    matchedUserId: resolvedRow.matched_user_id,
+    username: resolvedRow.username,
+  };
+}
+
 export async function linkUserToAuth(userId: string, _authUserId?: string) {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase.rpc("link_current_user_auth", {

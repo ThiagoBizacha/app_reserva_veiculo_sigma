@@ -22,6 +22,10 @@ import {
   canExecuteReservationOperation,
   getUserPermissions,
 } from "@/utils/authorization";
+import {
+  buildUniqueUsername,
+  normalizeUsernameInput,
+} from "@/utils/authIdentity";
 import type {
   NewReservationPayload,
   NewUserPayload,
@@ -186,7 +190,6 @@ function validateUserPayload(payload: NewUserPayload, users: User[], userId?: st
     payload.matricula,
     payload.areaDepartamento,
     payload.centroCusto,
-    payload.email,
     payload.telefone,
     payload.cnhCategoria,
   ];
@@ -205,13 +208,27 @@ function validateUserPayload(payload: NewUserPayload, users: User[], userId?: st
     return "Ja existe um usuario com essa matricula.";
   }
 
+  const normalizedEmail = payload.email.trim().toLowerCase();
+  const normalizedUsername = normalizeUsernameInput(payload.username);
+
   if (
+    normalizedEmail &&
     users.some(
       (item) =>
-        item.id !== userId && item.email.toLowerCase() === payload.email.trim().toLowerCase()
+        item.id !== userId && item.email.toLowerCase() === normalizedEmail
     )
   ) {
     return "Ja existe um usuario com esse e-mail.";
+  }
+
+  if (
+    normalizedUsername &&
+    users.some(
+      (item) =>
+        item.id !== userId && normalizeUsernameInput(item.username) === normalizedUsername
+    )
+  ) {
+    return "Ja existe um usuario com esse nome de usuario.";
   }
 
   if (
@@ -226,27 +243,37 @@ function validateUserPayload(payload: NewUserPayload, users: User[], userId?: st
 
 function buildUserRecord(
   payload: NewUserPayload,
-  actor: ActorContext,
+  snapshot: ServiceSnapshot,
   existingUser?: User
 ): User {
   const resolvedId = existingUser?.id ?? generateEntityId("usr");
   const normalizedEmail = payload.email.trim().toLowerCase();
+  const takenUsernames = snapshot.users
+    .filter((item) => item.id !== existingUser?.id)
+    .map((item) => item.username);
+  const resolvedUsername = buildUniqueUsername(
+    payload.fullName.trim(),
+    takenUsernames,
+    payload.username || existingUser?.username
+  );
   const trimmedManagerName = payload.gestorNome?.trim();
 
   return {
     id: resolvedId,
     userId: existingUser?.userId ?? resolvedId,
     fullName: payload.fullName.trim(),
+    username: resolvedUsername,
     cpf: payload.cpf.trim(),
     gestorVeiculo: payload.role !== "Solicitante",
     matricula: payload.matricula.trim().toUpperCase(),
-    matriz: payload.matriz?.trim() || existingUser?.matriz || actor.currentUser.matriz || "Belo Horizonte",
+    matriz:
+      payload.matriz?.trim() || existingUser?.matriz || snapshot.currentUser.matriz || "Belo Horizonte",
     role: payload.role,
     areaDepartamento: payload.areaDepartamento.trim(),
     centroCusto: payload.centroCusto.trim().toUpperCase(),
     email: normalizedEmail,
     telefone: payload.telefone.trim(),
-    gestorNome: trimmedManagerName || existingUser?.gestorNome || actor.currentUser.fullName,
+    gestorNome: trimmedManagerName || existingUser?.gestorNome || snapshot.currentUser.fullName,
     cnhNumero: payload.cnhNumero.trim().toUpperCase(),
     cnhCategoria: payload.cnhCategoria.trim().toUpperCase(),
     cnhStatus: payload.cnhStatus,
@@ -460,7 +487,7 @@ export async function createUserUseCase(
 
   return {
     success: true,
-    message: `Usuario ${user.fullName} cadastrado com sucesso.`,
+    message: `Usuario ${user.fullName} cadastrado com sucesso. Login: ${user.username}.`,
     user,
   };
 }
@@ -499,7 +526,7 @@ export async function updateUserUseCase(
 
   return {
     success: true,
-    message: `Usuario ${user.fullName} atualizado com sucesso.`,
+    message: `Usuario ${user.fullName} atualizado com sucesso. Login: ${user.username}.`,
     user,
   };
 }

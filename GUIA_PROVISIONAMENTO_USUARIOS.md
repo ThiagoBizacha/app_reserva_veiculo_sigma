@@ -1,230 +1,247 @@
-# Guia de Provisionamento de Usuários — Sigma Reserva
+# Guia de Provisionamento de Usuarios - Sigma Reserva
 
-Este guia é para o **administrador do sistema** responsável por criar e gerenciar contas de acesso ao app.
+Este guia e para o administrador do sistema responsavel por criar, importar, provisionar e resetar acessos no app.
 
----
+## Visao geral do fluxo
 
-## Visão geral do fluxo
-
+```text
+Admin cadastra ou importa usuario em public.users
+        |
+        v
+Admin roda npm run auth:provision:supabase
+        |
+        v
+Supabase Auth cria ou sincroniza a conta
+        |
+        v
+Admin comunica username e senha temporaria
+        |
+        v
+Usuario entra no app com username ou email
+        |
+        v
+App exige troca de senha no primeiro acesso
 ```
-Admin cadastra usuário no app (Settings)
-        ↓
-Admin roda o script de provisionamento
-        ↓
-Script cria conta no Supabase Auth com senha temporária
-        ↓
-Admin comunica email + senha temporária ao usuário
-        ↓
-Usuário abre o app e faz login
-        ↓
-App exige troca de senha antes de liberar acesso
-        ↓
-Usuário define senha definitiva e começa a usar
-```
 
----
+## Regra de login
 
-## Pré-requisitos do admin
+- o identificador principal agora e `username`
+- `email` e opcional
+- se o usuario tiver email, o Auth usa esse email real
+- se o usuario nao tiver email, o Auth usa um email tecnico interno:
+  - `username@auth.sigmalithium.local`
+- para o usuario final, o login aceito no app e:
+  - `username`
+  - ou `email`, quando existir
 
-Antes de provisionar qualquer usuário, o admin precisa ter:
+Exemplos:
 
-1. **Node.js** instalado na máquina (v18+)
-2. O arquivo `.env.local` no projeto com as variáveis:
-   ```
-   EXPO_PUBLIC_SUPABASE_URL=https://ptjzkrhprxuvshkxhqfh.supabase.co
-   SUPABASE_SERVICE_ROLE_KEY=<chave secreta do projeto Supabase>
-   ```
-3. Dependências do projeto instaladas:
-   ```bash
-   npm install
-   ```
+- `TBIZACHA`
+- `GBANDEIRA`
+- `thiago.bizacha@sigmalithium.com.br`
 
-> A `SUPABASE_SERVICE_ROLE_KEY` nunca vai para o app. Ela é usada apenas neste script local.
+## Pre-requisitos
 
----
-
-## Passo 1 — Cadastrar o usuário no sistema
-
-O usuário precisa existir na tabela `public.users` antes de ter uma conta de autenticação.
-
-**Via app (tela de Configurações):**
-
-1. Abra o app como administrador
-2. Acesse a aba **Config**
-3. Na seção **Usuários**, toque em **Novo usuário**
-4. Preencha os dados: nome completo, matrícula, email, departamento e CNH (se aplicável)
-5. Salve
-
-**Via Supabase Dashboard (alternativa):**
-
-1. Acesse [supabase.com](https://supabase.com) → seu projeto → Table Editor → tabela `users`
-2. Insira uma linha com os campos obrigatórios: `id` (formato `usr-XXXXX`), `full_name`, `email`
-
----
-
-## Passo 2 — Criar a conta de autenticação
-
-Com o usuário na tabela `users`, rode o script de provisionamento:
+1. Ter `Node.js` instalado.
+2. Estar na raiz do projeto.
+3. Ter `.env.local` preenchido com:
 
 ```bash
-# Usando a senha temporária definida no .env.local (SUPABASE_AUTH_TEMP_PASSWORD)
-npm run auth:provision:supabase
-
-# Ou passando a senha diretamente:
-npm run auth:provision:supabase -- --password=SigmaTemp2024
+EXPO_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=sua-chave-secreta
+SUPABASE_AUTH_TEMP_PASSWORD=123456
 ```
 
-**O que o script faz:**
+4. Ter aplicado no Supabase as migrations:
 
-- Lê todos os usuários de `public.users`
-- Para cada usuário com `email`:
-  - Se **não tem conta** no Supabase Auth → cria com a senha temporária e define `must_change_password: true`
-  - Se **já tem conta** → sincroniza os metadados (nome, vínculo) sem alterar senha
-- Grava o `auth_user_id` de volta em `public.users` para vincular as contas
+- `202604150007_users_schema_compatibilidade.sql`
+- `202604150009_username_login.sql`
 
-**Saída esperada:**
+## Passo 1 - Cadastrar um usuario manualmente
 
-```
-Provisionamento de usuarios autenticados concluido.
-Usuarios vinculados: 5
-Senha temporaria aplicada: SigmaTemp2024
+Voce pode cadastrar pelo app ou direto no Supabase.
 
-usr-01 | joao.silva@sigma.com.br | João Silva
-usr-02 | maria.souza@sigma.com.br | Maria Souza
-...
-```
+Campos principais recomendados:
 
-> O script é **idempotente**: pode ser rodado várias vezes sem duplicar contas.
+- `full_name`
+- `username`
+- `matricula`
+- `role`
+- `area_departamento`
+- `centro_custo`
+- `telefone`
+- `matriz`
+- `cnh_categoria`
+- `cnh_status`
 
----
+Campo opcional:
 
-## Passo 3 — Comunicar as credenciais ao usuário
+- `email`
 
-Envie para o usuário (por Teams, email ou mensagem):
+Observacoes:
 
-```
-App: Sigma Reserva
-Link/QR: <link do APK ou QR gerado pelo EAS>
+- `username` deve ser unico
+- `email` pode ficar vazio
+- `cpf` e `cnh_numero` podem ficar vazios
 
-Email de acesso: joao.silva@sigma.com.br
-Senha temporária: SigmaTemp2024
+## Passo 2 - Importar usuarios em massa da planilha
 
-No primeiro acesso o app vai pedir para você definir uma senha pessoal.
-```
-
----
-
-## Passo 4 — Primeiro acesso do usuário
-
-O usuário não precisa configurar nada. Basta:
-
-1. Instalar o APK (uma vez)
-2. Abrir o app → ver a tela de login com o logo Sigma
-3. Digitar o email e a senha temporária
-4. O app redireciona automaticamente para a tela **"Definir nova senha"**
-5. Digitar a nova senha (mínimo 6 dígitos numéricos) e confirmar
-6. Toque em **Salvar nova senha**
-7. O app libera acesso completo imediatamente
-
-A partir do segundo acesso, o usuário entra diretamente com a senha que definiu.
-
----
-
-## Gerenciar usuários existentes
-
-### Redefinir senha de um usuário
-
-O jeito mais prático agora é usar o script local do projeto, sem email:
+Dry-run:
 
 ```bash
-# Ver a lista de usuários disponíveis
-npm run auth:reset:supabase -- --list
-
-# Resetar por id interno do app
-npm run auth:reset:supabase -- --user=usr-01 --password=123456
-
-# Resetar por matrícula
-npm run auth:reset:supabase -- --matricula=SIG-20451 --password=123456
+npm run users:import:supabase -- --file="C:\caminho\usuarios.xlsx" --dry-run
 ```
 
-Por padrão, o script:
-
-- altera a senha no `Supabase Auth`;
-- mantém o vínculo com `public.users`;
-- marca `must_change_password: true`, obrigando o usuário a trocar a senha ao entrar.
-
-Se você quiser resetar a senha sem forçar nova troca:
+Aplicacao real:
 
 ```bash
-npm run auth:reset:supabase -- --user=usr-01 --password=123456 --no-force-change
+npm run users:import:supabase -- --file="C:\caminho\usuarios.xlsx" --apply
 ```
-
-### Adicionar usuários em lote
-
-Se precisar cadastrar vários usuários de uma vez a partir da planilha oficial:
-
-1. Aplique no Supabase a migration de compatibilidade do schema simplificado:
-   - `202604150007_users_schema_compatibilidade.sql`
-2. Rode primeiro a análise sem gravar nada:
-   ```bash
-   npm run users:import:supabase -- --file="C:\caminho\usuarios.xlsx" --dry-run
-   ```
-3. Revise as linhas ignoradas e os alertas.
-4. Quando estiver ok, aplique a carga:
-   ```bash
-   npm run users:import:supabase -- --file="C:\caminho\usuarios.xlsx" --apply
-   ```
-5. Depois disso, provisione o login:
-   ```bash
-   npm run auth:provision:supabase
-   ```
 
 O importador:
 
-- lê `.xlsx` ou `.csv`;
-- usa `email` e `matricula` para identificar usuários existentes;
-- preserva administradores e operadores já cadastrados fora da planilha;
-- não apaga usuários ausentes na planilha;
-- aceita `CPF` e `CNH_Numero` vazios.
+- le `.xlsx` e `.csv`
+- gera `username` unico
+- atualiza ou insere por `email`, `matricula` ou `username`
+- permite usuarios sem email
+- nao apaga usuarios fora da planilha
+- aceita `cpf` e `cnh_numero` vazios
 
-### Revogar acesso de um usuário
+Depois da carga, rode sempre o provisionamento do Auth.
 
-1. No Supabase Dashboard → Authentication → Users
-2. Localize o usuário e clique em **Delete user**
-3. Opcionalmente, desative ou remova da tabela `public.users` para que não apareça na listagem do app
+## Passo 3 - Provisionar o Supabase Auth
 
----
+Comando:
+
+```bash
+npm run auth:provision:supabase
+```
+
+Ou com senha explicita:
+
+```bash
+npm run auth:provision:supabase -- --password=123456
+```
+
+O script:
+
+- le os usuarios de `public.users`
+- cria contas no Supabase Auth quando ainda nao existem
+- sincroniza contas ja existentes
+- grava `auth_user_id` em `public.users`
+- marca `must_change_password = true`
+
+Saida esperada:
+
+```text
+Provisionamento de usuarios autenticados concluido.
+Usuarios vinculados: 58
+Senha temporaria aplicada: 123456
+
+usr-01 | TBIZACHA | thiago.bizacha@sigmalithium.com.br | Thiago Nunes Bizacha
+usr-import-00392496 | GBANDEIRA | gbandeira@auth.sigmalithium.local | Gabriel Fiussem Bandeira
+```
+
+## Passo 4 - Comunicar o acesso ao usuario
+
+Passe ao usuario:
+
+- link do app: `https://sigma-reserva.vercel.app`
+- `username`
+- `email`, se existir
+- senha temporaria
+
+Exemplo:
+
+```text
+App: Sigma Reserva
+Link: https://sigma-reserva.vercel.app
+Usuario: TBIZACHA
+Senha temporaria: 123456
+
+No primeiro acesso o sistema vai pedir a definicao da senha definitiva.
+```
+
+## Passo 5 - Primeiro acesso
+
+O usuario deve:
+
+1. abrir `https://sigma-reserva.vercel.app`
+2. informar `username` ou `email`
+3. informar a senha temporaria
+4. definir uma nova senha numerica com pelo menos `6` digitos
+
+## Reset de senha
+
+Listar usuarios:
+
+```bash
+npm run auth:reset:supabase -- --list
+```
+
+Reset por `id`:
+
+```bash
+npm run auth:reset:supabase -- --user=usr-01 --password=123456
+```
+
+Reset por `username`:
+
+```bash
+npm run auth:reset:supabase -- --username=TBIZACHA --password=123456
+```
+
+Reset por `matricula`:
+
+```bash
+npm run auth:reset:supabase -- --matricula=SIG-20451 --password=123456
+```
+
+Sem forcar troca no proximo login:
+
+```bash
+npm run auth:reset:supabase -- --username=TBIZACHA --password=123456 --no-force-change
+```
+
+## Conferencias no Supabase
+
+Depois do provisionamento, confira:
+
+1. `Table Editor > public.users`
+2. coluna `username` preenchida
+3. coluna `auth_user_id` preenchida
+4. `Authentication > Users`
+
+Resultados esperados:
+
+- todos os usuarios com `auth_user_id`
+- usuarios sem email real presentes no Auth com email tecnico
+- login funcionando por `username`
 
 ## Troubleshooting
 
-| Problema | Causa provável | Solução |
+| Problema | Causa provavel | Acao |
 |---|---|---|
-| Script termina com erro de credenciais | `SUPABASE_SERVICE_ROLE_KEY` não definida ou incorreta no `.env.local` | Verifique o arquivo `.env.local` |
-| Usuário não aparece na saída do script | `email` está vazio na tabela `users` | Preencha o campo no app (Settings) ou direto no Supabase |
-| Usuário consegue logar mas app trava na tela de loading | `auth_user_id` não foi gravado em `public.users` | Rode o script novamente — ele faz o vínculo automático |
-| Usuário vê "Backend não configurado" | APK foi gerado sem as variáveis de ambiente embarcadas | Rebuild com o perfil `production` do EAS |
-| App não exige troca de senha no primeiro acesso | `must_change_password` não está `true` nos metadados | Verifique no Supabase Auth → User → Metadata |
+| usuario nao consegue logar por username | `202604150009` nao foi aplicada | aplique a migration e rode `npm run auth:provision:supabase` |
+| usuario sem email nao entrou no Auth | provisionamento nao foi rerodado | rode `npm run auth:provision:supabase` |
+| linha da planilha foi ignorada | faltou `matricula` | corrija a planilha e importe novamente |
+| usuario aparece sem auth | `auth_user_id` vazio | rode `npm run auth:provision:supabase` |
 
----
-
-## Referência rápida de comandos
+## Referencia rapida
 
 ```bash
-# Provisionar todos os usuários com senha do .env.local
+# importar planilha sem gravar
+npm run users:import:supabase -- --file="C:\caminho\usuarios.xlsx" --dry-run
+
+# importar planilha de verdade
+npm run users:import:supabase -- --file="C:\caminho\usuarios.xlsx" --apply
+
+# provisionar auth
 npm run auth:provision:supabase
 
-# Provisionar com senha específica
-npm run auth:provision:supabase -- --password=MinhaSenh@2024
-
-# Listar usuários disponíveis para reset
+# listar usuarios para reset
 npm run auth:reset:supabase -- --list
 
-# Resetar senha por id interno
-npm run auth:reset:supabase -- --user=usr-01 --password=123456
-
-# Buildar o APK para distribuição
-eas build --profile production --platform android
-
-# Publicar atualização OTA (sem rebuild)
-eas update --branch production --message "descrição da atualização"
+# resetar por username
+npm run auth:reset:supabase -- --username=TBIZACHA --password=123456
 ```

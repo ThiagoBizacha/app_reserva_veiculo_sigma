@@ -52,6 +52,7 @@ import {
   updateVehicleUseCase,
 } from "@/services/reservationService";
 import { useAuthSession } from "./useAuthSession";
+import { buildAuthLoginEmail } from "@/utils/authIdentity";
 
 interface ReservationStoreValue {
   users: User[];
@@ -106,6 +107,7 @@ const EMPTY_USER: User = {
   id: "unconfigured-user",
   userId: "unconfigured-user",
   fullName: "Usuario nao configurado",
+  username: "UNCONFIGURED",
   cpf: "",
   gestorVeiculo: false,
   matricula: "",
@@ -138,7 +140,7 @@ function userMatchesAuthIdentity(user: User, authUserId?: string, authEmail?: st
     return false;
   }
 
-  return normalizeEmail(user.email) === authEmail;
+  return normalizeEmail(buildAuthLoginEmail(user.email, user.username)) === authEmail;
 }
 
 const ReservationStoreContext = createContext<ReservationStoreValue | null>(null);

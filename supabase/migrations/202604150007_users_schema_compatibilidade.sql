@@ -1,13 +1,27 @@
 alter table public.users
   add column if not exists gestor_nome text;
 
-update public.users as target
-set
-  gestor_nome = manager.full_name,
-  updated_at = timezone('utc', now())
-from public.users as manager
-where target.gestor_id = manager.id
-  and (target.gestor_nome is null or btrim(target.gestor_nome) = '');
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'users'
+      and column_name = 'gestor_id'
+  ) then
+    execute $sql$
+      update public.users as target
+      set
+        gestor_nome = manager.full_name,
+        updated_at = timezone('utc', now())
+      from public.users as manager
+      where target.gestor_id = manager.id
+        and (target.gestor_nome is null or btrim(target.gestor_nome) = '')
+    $sql$;
+  end if;
+end;
+$$;
 
 update public.users
 set
@@ -16,18 +30,71 @@ set
 where role = 'Administrador'
   and (gestor_nome is null or btrim(gestor_nome) = '');
 
-update public.users
-set
-  email = lower(trim(coalesce(nullif(email, ''), email_corporativo))),
-  updated_at = timezone('utc', now())
-where email is distinct from lower(trim(coalesce(nullif(email, ''), email_corporativo)));
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'users'
+      and column_name = 'email_corporativo'
+  ) then
+    execute $sql$
+      update public.users
+      set
+        email = lower(trim(coalesce(nullif(email, ''), email_corporativo))),
+        updated_at = timezone('utc', now())
+      where email is distinct from lower(trim(coalesce(nullif(email, ''), email_corporativo)))
+    $sql$;
+  end if;
+end;
+$$;
 
-alter table public.users alter column name drop not null;
-alter table public.users alter column area drop not null;
-alter table public.users alter column email_corporativo drop not null;
-alter table public.users alter column cnh_uf_emissao drop not null;
-alter table public.users alter column cpf drop not null;
-alter table public.users alter column cnh_numero drop not null;
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'users' and column_name = 'name'
+  ) then
+    alter table public.users alter column name drop not null;
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'users' and column_name = 'area'
+  ) then
+    alter table public.users alter column area drop not null;
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'users' and column_name = 'email_corporativo'
+  ) then
+    alter table public.users alter column email_corporativo drop not null;
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'users' and column_name = 'cnh_uf_emissao'
+  ) then
+    alter table public.users alter column cnh_uf_emissao drop not null;
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'users' and column_name = 'cpf'
+  ) then
+    alter table public.users alter column cpf drop not null;
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'users' and column_name = 'cnh_numero'
+  ) then
+    alter table public.users alter column cnh_numero drop not null;
+  end if;
+end;
+$$;
 
 create or replace function public.current_auth_email()
 returns text
