@@ -9,7 +9,6 @@ import {
 import {
   isScheduledReservationActive,
 } from "@/utils/reservations";
-import { findUserByReference } from "@/utils/users";
 import {
   getDurationHours,
 } from "@/utils/date";
@@ -183,17 +182,13 @@ function buildVehicleRecord(
 
 function validateUserPayload(payload: NewUserPayload, users: User[], userId?: string) {
   const requiredFields = [
-    payload.name,
     payload.fullName,
-    payload.cpf,
     payload.matricula,
     payload.areaDepartamento,
     payload.centroCusto,
-    payload.emailCorporativo,
+    payload.email,
     payload.telefone,
-    payload.cnhNumero,
     payload.cnhCategoria,
-    payload.cnhUfEmissao,
   ];
 
   if (requiredFields.some((field) => !field.trim())) {
@@ -213,19 +208,17 @@ function validateUserPayload(payload: NewUserPayload, users: User[], userId?: st
   if (
     users.some(
       (item) =>
-        item.id !== userId &&
-        item.emailCorporativo.toLowerCase() === payload.emailCorporativo.trim().toLowerCase()
+        item.id !== userId && item.email.toLowerCase() === payload.email.trim().toLowerCase()
     )
   ) {
-    return "Ja existe um usuario com esse e-mail corporativo.";
+    return "Ja existe um usuario com esse e-mail.";
   }
 
-  if (users.some((item) => item.id !== userId && item.cpf === payload.cpf.trim())) {
+  if (
+    payload.cpf.trim() &&
+    users.some((item) => item.id !== userId && item.cpf === payload.cpf.trim())
+  ) {
     return "Ja existe um usuario com esse CPF.";
-  }
-
-  if (payload.gestorId?.trim() && !findUserByReference(users, payload.gestorId)) {
-    return "Superior imediato nao encontrado. Informe nome, e-mail, matricula ou ID de um colaborador existente.";
   }
 
   return null;
@@ -233,38 +226,29 @@ function validateUserPayload(payload: NewUserPayload, users: User[], userId?: st
 
 function buildUserRecord(
   payload: NewUserPayload,
-  users: User[],
   actor: ActorContext,
   existingUser?: User
 ): User {
   const resolvedId = existingUser?.id ?? generateEntityId("usr");
-  const corporateEmail = payload.emailCorporativo.trim().toLowerCase();
-  const resolvedManagerId = findUserByReference(users, payload.gestorId)?.id;
+  const normalizedEmail = payload.email.trim().toLowerCase();
+  const trimmedManagerName = payload.gestorNome?.trim();
 
   return {
     id: resolvedId,
     userId: existingUser?.userId ?? resolvedId,
-    name: payload.name.trim(),
     fullName: payload.fullName.trim(),
     cpf: payload.cpf.trim(),
     gestorVeiculo: payload.role !== "Solicitante",
     matricula: payload.matricula.trim().toUpperCase(),
     matriz: payload.matriz?.trim() || existingUser?.matriz || actor.currentUser.matriz || "Belo Horizonte",
     role: payload.role,
-    area: payload.areaDepartamento.trim(),
     areaDepartamento: payload.areaDepartamento.trim(),
     centroCusto: payload.centroCusto.trim().toUpperCase(),
-    email: corporateEmail,
-    emailCorporativo: corporateEmail,
+    email: normalizedEmail,
     telefone: payload.telefone.trim(),
-    gestorId:
-      resolvedManagerId ||
-      existingUser?.gestorId ||
-      actor.currentUser.gestorId ||
-      actor.currentUser.id,
+    gestorNome: trimmedManagerName || existingUser?.gestorNome || actor.currentUser.fullName,
     cnhNumero: payload.cnhNumero.trim().toUpperCase(),
     cnhCategoria: payload.cnhCategoria.trim().toUpperCase(),
-    cnhUfEmissao: payload.cnhUfEmissao.trim().toUpperCase(),
     cnhStatus: payload.cnhStatus,
     cnhDataUltimaValidacao: existingUser?.cnhDataUltimaValidacao ?? new Date().toISOString(),
     cnhAnexo: payload.cnhAnexo?.trim() || "",
@@ -465,7 +449,7 @@ export async function createUserUseCase(
     return { success: false, message: validationError };
   }
 
-  const user = buildUserRecord(payload, snapshot.users, snapshot);
+  const user = buildUserRecord(payload, snapshot);
   await upsertUser(user);
   await appendAuditLog(
     buildAuditEntry("user", user.id, "user.created", snapshot, {
@@ -504,7 +488,7 @@ export async function updateUserUseCase(
     return { success: false, message: validationError };
   }
 
-  const user = buildUserRecord(payload, snapshot.users, snapshot, existingUser);
+  const user = buildUserRecord(payload, snapshot, existingUser);
   await upsertUser(user);
   await appendAuditLog(
     buildAuditEntry("user", user.id, "user.updated", snapshot, {

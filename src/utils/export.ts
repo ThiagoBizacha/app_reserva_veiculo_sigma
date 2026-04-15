@@ -119,8 +119,8 @@ export function buildReservationsCsv(
     return [
       reservation.code,
       reservation.status,
-      requester?.fullName ?? requester?.name ?? "-",
-      requester?.emailCorporativo ?? requester?.email ?? "-",
+      requester?.fullName ?? "-",
+      requester?.email ?? "-",
       resource?.name ?? "-",
       resource?.code ?? "-",
       resource?.plate ?? "-",

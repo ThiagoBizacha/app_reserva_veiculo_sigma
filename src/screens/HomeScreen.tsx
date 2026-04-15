@@ -12,13 +12,8 @@ import { getUserPermissions } from "@/utils/authorization";
 import type { User } from "@/types";
 
 export function HomeScreen() {
-  const {
-    currentUser,
-    currentUserName,
-    users,
-    getActionableReservations,
-    getSummary,
-  } = useReservationStore();
+  const { currentUser, currentUserName, getActionableReservations, getSummary } =
+    useReservationStore();
   const { isSubmitting, signOut } = useAuthSession();
   const insets = useSafeAreaInsets();
   const [licenseUser, setLicenseUser] = useState<User | null>(null);
@@ -26,8 +21,7 @@ export function HomeScreen() {
   const myOpenReservations = getActionableReservations().length;
   const requesterDepartment = currentUser.areaDepartamento;
   const requesterCostCenter = currentUser.centroCusto;
-  const requesterManagerName =
-    users.find((user) => user.id === currentUser.gestorId)?.fullName ?? "Superior não definido";
+  const requesterManagerName = currentUser.gestorNome || "Superior não definido";
   const currentUserPermissions = getUserPermissions(currentUser);
   const normalizedCnhStatus = currentUser.cnhStatus
     .normalize("NFD")
@@ -40,7 +34,7 @@ export function HomeScreen() {
     const result = await signOut();
 
     if (!result.success && result.message) {
-      Alert.alert("Falha ao encerrar sessao", result.message);
+      Alert.alert("Falha ao encerrar sessão", result.message);
     }
   };
 

@@ -52,13 +52,13 @@ O usuário precisa existir na tabela `public.users` antes de ter uma conta de au
 1. Abra o app como administrador
 2. Acesse a aba **Config**
 3. Na seção **Usuários**, toque em **Novo usuário**
-4. Preencha os dados: nome, matrícula, email corporativo, departamento, cargo, CNH (se aplicável)
+4. Preencha os dados: nome completo, matrícula, email, departamento e CNH (se aplicável)
 5. Salve
 
 **Via Supabase Dashboard (alternativa):**
 
 1. Acesse [supabase.com](https://supabase.com) → seu projeto → Table Editor → tabela `users`
-2. Insira uma linha com os campos obrigatórios: `id` (formato `usr-XXXXX`), `full_name`, `email_corporativo`
+2. Insira uma linha com os campos obrigatórios: `id` (formato `usr-XXXXX`), `full_name`, `email`
 
 ---
 
@@ -77,7 +77,7 @@ npm run auth:provision:supabase -- --password=SigmaTemp2024
 **O que o script faz:**
 
 - Lê todos os usuários de `public.users`
-- Para cada usuário com `email_corporativo`:
+- Para cada usuário com `email`:
   - Se **não tem conta** no Supabase Auth → cria com a senha temporária e define `must_change_password: true`
   - Se **já tem conta** → sincroniza os metadados (nome, vínculo) sem alterar senha
 - Grava o `auth_user_id` de volta em `public.users` para vincular as contas
@@ -120,7 +120,7 @@ O usuário não precisa configurar nada. Basta:
 
 1. Instalar o APK (uma vez)
 2. Abrir o app → ver a tela de login com o logo Sigma
-3. Digitar o email corporativo e a senha temporária
+3. Digitar o email e a senha temporária
 4. O app redireciona automaticamente para a tela **"Definir nova senha"**
 5. Digitar a nova senha (mínimo 6 dígitos numéricos) e confirmar
 6. Toque em **Salvar nova senha**
@@ -161,13 +161,31 @@ npm run auth:reset:supabase -- --user=usr-01 --password=123456 --no-force-change
 
 ### Adicionar usuários em lote
 
-Se precisar cadastrar vários usuários de uma vez:
+Se precisar cadastrar vários usuários de uma vez a partir da planilha oficial:
 
-1. Insira todos na tabela `public.users` (via Supabase Dashboard ou script SQL)
-2. Rode o script de provisionamento uma única vez — ele processa todos:
+1. Aplique no Supabase a migration de compatibilidade do schema simplificado:
+   - `202604150007_users_schema_compatibilidade.sql`
+2. Rode primeiro a análise sem gravar nada:
    ```bash
-   npm run auth:provision:supabase -- --password=SigmaTemp2024
+   npm run users:import:supabase -- --file="C:\caminho\usuarios.xlsx" --dry-run
    ```
+3. Revise as linhas ignoradas e os alertas.
+4. Quando estiver ok, aplique a carga:
+   ```bash
+   npm run users:import:supabase -- --file="C:\caminho\usuarios.xlsx" --apply
+   ```
+5. Depois disso, provisione o login:
+   ```bash
+   npm run auth:provision:supabase
+   ```
+
+O importador:
+
+- lê `.xlsx` ou `.csv`;
+- usa `email` e `matricula` para identificar usuários existentes;
+- preserva administradores e operadores já cadastrados fora da planilha;
+- não apaga usuários ausentes na planilha;
+- aceita `CPF` e `CNH_Numero` vazios.
 
 ### Revogar acesso de um usuário
 
@@ -182,7 +200,7 @@ Se precisar cadastrar vários usuários de uma vez:
 | Problema | Causa provável | Solução |
 |---|---|---|
 | Script termina com erro de credenciais | `SUPABASE_SERVICE_ROLE_KEY` não definida ou incorreta no `.env.local` | Verifique o arquivo `.env.local` |
-| Usuário não aparece na saída do script | `email_corporativo` está vazio na tabela `users` | Preencha o campo no app (Settings) ou direto no Supabase |
+| Usuário não aparece na saída do script | `email` está vazio na tabela `users` | Preencha o campo no app (Settings) ou direto no Supabase |
 | Usuário consegue logar mas app trava na tela de loading | `auth_user_id` não foi gravado em `public.users` | Rode o script novamente — ele faz o vínculo automático |
 | Usuário vê "Backend não configurado" | APK foi gerado sem as variáveis de ambiente embarcadas | Rebuild com o perfil `production` do EAS |
 | App não exige troca de senha no primeiro acesso | `must_change_password` não está `true` nos metadados | Verifique no Supabase Auth → User → Metadata |

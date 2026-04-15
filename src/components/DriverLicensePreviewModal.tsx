@@ -1,4 +1,4 @@
-﻿import { Feather } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import type { ReactNode } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
@@ -10,10 +10,7 @@ interface DriverLicensePreviewModalProps {
   onClose: () => void;
 }
 
-export function DriverLicensePreviewModal({
-  user,
-  onClose,
-}: DriverLicensePreviewModalProps) {
+export function DriverLicensePreviewModal({ user, onClose }: DriverLicensePreviewModalProps) {
   if (!user) {
     return null;
   }
@@ -33,7 +30,7 @@ export function DriverLicensePreviewModal({
             <View style={styles.headerCopy}>
               <Text style={styles.title}>CNH do colaborador</Text>
               <Text style={styles.subtitle}>
-                Pré-visualização do PDF mockado para {user.fullName}
+                Pré-visualização do documento vinculado para {user.fullName}
               </Text>
             </View>
             <Pressable style={styles.closeIconButton} onPress={onClose}>
@@ -54,7 +51,7 @@ export function DriverLicensePreviewModal({
                 <View style={styles.pageHeaderCopy}>
                   <Text style={styles.pageOverline}>CNH DIGITAL</Text>
                   <Text style={styles.pageTitle}>Carteira Nacional de Habilitação</Text>
-                  <Text style={styles.pageSubtitle}>Uso interno / visualização mockada</Text>
+                  <Text style={styles.pageSubtitle}>Uso interno / visualização simplificada</Text>
                 </View>
                 <View
                   style={[
@@ -75,14 +72,13 @@ export function DriverLicensePreviewModal({
 
               <View style={styles.fieldGrid}>
                 <DocumentField label="Nome" value={user.fullName} />
-                <DocumentField label="CPF" value={user.cpf} />
-                <DocumentField label="Número da CNH" value={user.cnhNumero} />
+                <DocumentField label="CPF" value={user.cpf || "-"} />
+                <DocumentField label="Número da CNH" value={user.cnhNumero || "-"} />
                 <DocumentField label="Categoria" value={user.cnhCategoria} />
-                <DocumentField label="UF de emissão" value={user.cnhUfEmissao} />
                 <DocumentField label="Matrícula" value={user.matricula} />
                 <DocumentField label="Área" value={user.areaDepartamento} />
                 <DocumentField label="Centro de custo" value={user.centroCusto} />
-                <DocumentField label="Email" value={user.emailCorporativo} />
+                <DocumentField label="Email" value={user.email} />
                 <DocumentField label="Telefone" value={user.telefone} />
               </View>
 
@@ -104,7 +100,7 @@ export function DriverLicensePreviewModal({
 
               <View style={styles.footer}>
                 <Text style={styles.footerText}>
-                  Documento mockado para demonstração do fluxo de PDF da CNH na home.
+                  Documento usado para conferência rápida dos dados de habilitação no app.
                 </Text>
                 <Text style={styles.footerMeta}>
                   Validado em {formatDateTime(user.cnhDataUltimaValidacao)}
@@ -331,4 +327,3 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
-

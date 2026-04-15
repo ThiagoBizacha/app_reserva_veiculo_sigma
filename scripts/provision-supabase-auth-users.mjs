@@ -97,7 +97,7 @@ async function listExistingAuthUsers() {
 async function loadPublicUsers() {
   const { data, error } = await supabase
     .from("users")
-    .select("id, full_name, email, email_corporativo, auth_user_id")
+    .select("id, full_name, email, auth_user_id")
     .order("full_name");
 
   if (error) {
@@ -108,7 +108,7 @@ async function loadPublicUsers() {
 }
 
 async function createAuthUser(user, password) {
-  const loginEmail = normalizeEmail(user.email_corporativo || user.email);
+  const loginEmail = normalizeEmail(user.email);
 
   if (!loginEmail) {
     throw new Error(`Usuario ${user.id} nao possui email para provisionamento.`);
@@ -195,7 +195,7 @@ async function run() {
   const provisionedAccounts = [];
 
   for (const publicUser of publicUsers) {
-    const loginEmail = normalizeEmail(publicUser.email_corporativo || publicUser.email);
+    const loginEmail = normalizeEmail(publicUser.email);
 
     if (!loginEmail) {
       continue;

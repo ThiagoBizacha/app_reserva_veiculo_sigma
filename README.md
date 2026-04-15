@@ -79,6 +79,8 @@ Execute as migrations na ordem abaixo no Supabase:
 3. [supabase/migrations/202604140003_b02_roles_iniciais.sql](/c:/Users/ThiagoBizacha/projects/app_reserva_veiculo_sigma/supabase/migrations/202604140003_b02_roles_iniciais.sql:1)
 4. [supabase/migrations/202604140004_drop_campos_obsoletos_resources.sql](/c:/Users/ThiagoBizacha/projects/app_reserva_veiculo_sigma/supabase/migrations/202604140004_drop_campos_obsoletos_resources.sql:1)
 5. [supabase/migrations/202604140005_b02_rls_por_papel_e_ownership.sql](/c:/Users/ThiagoBizacha/projects/app_reserva_veiculo_sigma/supabase/migrations/202604140005_b02_rls_por_papel_e_ownership.sql:1)
+6. [supabase/migrations/202604150007_users_schema_compatibilidade.sql](/c:/Users/ThiagoBizacha/projects/app_reserva_veiculo_sigma/supabase/migrations/202604150007_users_schema_compatibilidade.sql:1)
+7. [supabase/migrations/202604150008_users_schema_limpeza.sql](/c:/Users/ThiagoBizacha/projects/app_reserva_veiculo_sigma/supabase/migrations/202604150008_users_schema_limpeza.sql:1)
 
 Resumo:
 
@@ -86,7 +88,9 @@ Resumo:
 - `202604130002`: adiciona `auth_user_id` e fecha acesso anonimo;
 - `202604140003`: remove `Gestor` como papel e padroniza `Solicitante`, `Operacao` e `Administrador`;
 - `202604140004`: remove campos obsoletos de `public.resources`;
-- `202604140005`: aplica RLS real por perfil e ownership, alem das RPCs seguras de vinculacao e cancelamento do solicitante.
+- `202604140005`: aplica RLS real por perfil e ownership, alem das RPCs seguras de vinculacao e cancelamento do solicitante;
+- `202604150007`: adiciona compatibilidade para o novo schema simplificado de `users`, passa a usar apenas `email` no vinculo com auth e libera `cpf`/`cnh_numero` vazios;
+- `202604150008`: remove definitivamente `name`, `area`, `email_corporativo`, `cnh_uf_emissao` e `gestor_id`.
 
 O bloco de autenticacao e autorizacao:
 
@@ -148,6 +152,43 @@ Esse script:
 Todos os usuarios provisionados recebem a mesma senha temporaria definida em `SUPABASE_AUTH_TEMP_PASSWORD`.
 No primeiro login com essa senha, o app redireciona para a tela de definicao da senha definitiva, que agora aceita senha numerica com minimo de 6 digitos.
 
+#### Passo a passo para cadastrar um novo usuario e vincular ao Auth
+
+1. Crie o usuario em `public.users`.
+Pode ser pelo app, em `Configuracoes > Gerenciar usuarios`, ou direto no `Table Editor` do Supabase.
+
+2. Preencha obrigatoriamente um email valido no cadastro.
+O campo usado agora e `email`. O script usa esse email para criar ou localizar a conta correspondente no `Supabase Auth`.
+
+3. Salve o cadastro do usuario em `public.users`.
+
+4. Na raiz do projeto, rode:
+
+```bash
+npm run auth:provision:supabase
+```
+
+5. O script vai:
+- ler os registros de `public.users`;
+- criar a conta no `Supabase Auth` se ela ainda nao existir;
+- reaproveitar a conta do `Auth` se ja existir com o mesmo email;
+- gravar o `auth_user_id` em `public.users`;
+- marcar `must_change_password = true` para primeiro acesso.
+
+6. Confirme no Supabase:
+- `Authentication > Users`: o usuario deve aparecer no Auth;
+- `Table Editor > public.users`: a coluna `auth_user_id` deve ficar preenchida.
+
+7. Passe ao usuario:
+- o `email`;
+- a senha temporaria definida em `SUPABASE_AUTH_TEMP_PASSWORD`.
+
+8. No primeiro login, o usuario entra com a senha temporaria e o app obriga a definicao da senha definitiva.
+
+Observacao:
+- se o usuario ja existir em `auth.users` com o mesmo email, o script apenas faz o vinculo;
+- o app tambem tenta vincular automaticamente no primeiro login, mas o fluxo administrativo correto continua sendo rodar `npm run auth:provision:supabase`.
+
 ### 6. Resetar senha de um usuario sem email
 
 Para listar os usuarios disponiveis para reset:
@@ -175,6 +216,59 @@ Se voce quiser resetar sem forcar nova troca:
 npm run auth:reset:supabase -- --user=usr-01 --password=123456 --no-force-change
 ```
 
+### 7. Importar usuarios em massa de uma planilha oficial
+
+O projeto agora tem um importador em massa com leitura de `.xlsx` e `.csv`, sem depender de seed mockada.
+
+Dry-run:
+
+```bash
+npm run users:import:supabase -- --file="C:\caminho\usuarios.xlsx" --dry-run
+```
+
+Aplicacao real:
+
+```bash
+npm run users:import:supabase -- --file="C:\caminho\usuarios.xlsx" --apply
+```
+
+Comportamento:
+
+- le a primeira aba por padrao;
+- mapeia a planilha oficial para `public.users`;
+- usa apenas o campo `email` como identidade de login;
+- preserva usuarios ja existentes fora da planilha;
+- insere ou atualiza por correspondencia de `email` ou `matricula`;
+- nao apaga usuarios;
+- gera relatorio de linhas prontas, ignoradas e com alerta.
+
+Colunas esperadas da planilha:
+
+- `NomeCompleto`
+- `Gestor_Veiculo`
+- `Matricula`
+- `Matriz`
+- `EmailCorporativo`
+- `Telefone`
+- `AreaDepartamento`
+- `CentroCusto`
+- `GestorNome`
+- `CNH_Numero`
+- `CNH_Categoria`
+- `CNH_Status(Valida/vencida)`
+- `CNH_DataUltimaValidacao`
+- `CNH_Anexo`
+- `Termos_Paytrack`
+- `Observação`
+- `Perfil`
+
+Observacoes:
+
+- `CPF` e `CNH_Numero` podem ficar vazios;
+- se `CNH_Status` vier ausente ou invalido, o importador assume `Vencida` por seguranca;
+- se `CNH_DataUltimaValidacao` vier ausente ou invalida, o importador assume a data atual e registra alerta;
+- aplique primeiro a migration de compatibilidade `202604150007` antes de usar esse comando.
+
 ## Deploy web (produção)
 
 **App em produção:** [https://sigma-reserva.vercel.app](https://sigma-reserva.vercel.app)
@@ -192,6 +286,49 @@ npm run deploy:web
 
 Esse comando faz tudo: gera o bundle, vincula ao projeto `sigma-reserva` no Vercel e faz o deploy.
 O link permanece o mesmo após cada deploy — não precisa repassar para os usuários.
+
+#### Passo a passo para resetar a senha de um usuario
+
+1. Abra o terminal na raiz do projeto.
+
+2. Liste os usuarios disponiveis para reset:
+
+```bash
+npm run auth:reset:supabase -- --list
+```
+
+3. Escolha como vai identificar o usuario:
+- por `id` interno, exemplo `usr-01`;
+- por `matricula`, exemplo `SIG-20451`.
+
+4. Rode o reset com uma senha numerica de pelo menos 6 digitos.
+
+Por `id`:
+
+```bash
+npm run auth:reset:supabase -- --user=usr-01 --password=123456
+```
+
+Por `matricula`:
+
+```bash
+npm run auth:reset:supabase -- --matricula=SIG-20451 --password=123456
+```
+
+5. O resultado esperado no terminal e algo neste formato:
+- `Senha resetada com sucesso.`
+- identificacao do usuario;
+- confirmacao de `Troca obrigatoria no proximo login: sim`.
+
+6. Depois do reset, informe ao usuario:
+- o email de login dele;
+- a nova senha temporaria.
+
+7. No proximo acesso, o app vai obrigar a troca da senha.
+
+Observacoes:
+- se o comando disser que o usuario esta `sem-auth`, rode antes `npm run auth:provision:supabase`;
+- use `--no-force-change` apenas se voce realmente nao quiser forcar troca da senha no proximo login.
 
 ## Como rodar o app
 

@@ -16,15 +16,7 @@ export function findUserByReference(users: User[], reference?: string) {
   }
 
   const exactMatch = users.find((user) => {
-    const candidates = [
-      user.id,
-      user.userId,
-      user.fullName,
-      user.name,
-      user.matricula,
-      user.email,
-      user.emailCorporativo,
-    ];
+    const candidates = [user.id, user.userId, user.fullName, user.matricula, user.email];
 
     return candidates.some(
       (candidate) => normalizeUserSearchValue(candidate ?? "") === normalizedReference
@@ -36,7 +28,7 @@ export function findUserByReference(users: User[], reference?: string) {
   }
 
   const partialMatches = users.filter((user) => {
-    const candidates = [user.fullName, user.name, user.matricula, user.emailCorporativo];
+    const candidates = [user.fullName, user.matricula, user.email, user.gestorNome];
 
     return candidates.some((candidate) =>
       normalizeUserSearchValue(candidate ?? "").includes(normalizedReference)

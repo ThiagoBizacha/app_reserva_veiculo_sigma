@@ -261,26 +261,22 @@ export interface Database {
       users: {
         Row: {
           auth_user_id: string | null;
-          area: string;
           area_departamento: string;
           centro_custo: string;
           cnh_anexo: string;
           cnh_categoria: string;
           cnh_data_ultima_validacao: string;
-          cnh_numero: string;
+          cnh_numero: string | null;
           cnh_status: string;
-          cnh_uf_emissao: string;
-          cpf: string;
+          cpf: string | null;
           created_at: string;
           email: string;
-          email_corporativo: string;
           full_name: string;
-          gestor_id: string | null;
+          gestor_nome: string | null;
           gestor_veiculo: boolean;
           id: string;
           matricula: string;
           matriz: string;
-          name: string;
           observacao: string | null;
           role: string;
           telefone: string;
@@ -290,26 +286,22 @@ export interface Database {
         };
         Insert: {
           auth_user_id?: string | null;
-          area: string;
           area_departamento: string;
           centro_custo: string;
           cnh_anexo?: string;
           cnh_categoria: string;
           cnh_data_ultima_validacao?: string;
-          cnh_numero: string;
+          cnh_numero?: string | null;
           cnh_status: string;
-          cnh_uf_emissao: string;
-          cpf: string;
+          cpf?: string | null;
           created_at?: string;
           email: string;
-          email_corporativo: string;
           full_name: string;
-          gestor_id?: string | null;
+          gestor_nome?: string | null;
           gestor_veiculo?: boolean;
           id: string;
           matricula: string;
           matriz: string;
-          name: string;
           observacao?: string | null;
           role: string;
           telefone: string;
@@ -318,14 +310,7 @@ export interface Database {
           user_id: string;
         };
         Update: Partial<Database["public"]["Tables"]["users"]["Insert"]>;
-        Relationships: [
-          {
-            foreignKeyName: "users_gestor_id_fkey";
-            columns: ["gestor_id"];
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-        ];
+        Relationships: [];
       };
     };
     Views: Record<string, never>;

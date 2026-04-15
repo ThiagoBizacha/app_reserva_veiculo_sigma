@@ -128,7 +128,7 @@ function printUsage() {
 async function loadPublicUsers() {
   const { data, error } = await supabase
     .from("users")
-    .select("id, full_name, matricula, auth_user_id, email_corporativo")
+    .select("id, full_name, matricula, auth_user_id, email")
     .order("full_name");
 
   if (error) {

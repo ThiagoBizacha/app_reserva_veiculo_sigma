@@ -52,23 +52,21 @@ const emptyVehicleForm: NewVehiclePayload = {
   observation: "",
 };
 
-function buildInitialUserForm(matriz: string, gestorId?: string): NewUserPayload {
+function buildInitialUserForm(matriz: string, gestorNome?: string): NewUserPayload {
   return {
-    name: "",
     fullName: "",
     cpf: "",
     matricula: "",
     role: "Solicitante",
     areaDepartamento: "",
     centroCusto: "",
-    emailCorporativo: "",
+    email: "",
     telefone: "",
     cnhNumero: "",
     cnhCategoria: "B",
-    cnhUfEmissao: "MG",
     cnhStatus: "Válida",
     matriz,
-    gestorId,
+    gestorNome,
     cnhAnexo: "",
     observacao: "",
   };
@@ -95,21 +93,19 @@ function mapVehicleToForm(resource: Resource): NewVehiclePayload {
 
 function mapUserToForm(user: User, users: User[]): NewUserPayload {
   return {
-    name: user.name,
     fullName: user.fullName,
     cpf: user.cpf,
     matricula: user.matricula,
     role: user.role,
     areaDepartamento: user.areaDepartamento,
     centroCusto: user.centroCusto,
-    emailCorporativo: user.emailCorporativo,
+    email: user.email,
     telefone: user.telefone,
     cnhNumero: user.cnhNumero,
     cnhCategoria: user.cnhCategoria,
-    cnhUfEmissao: user.cnhUfEmissao,
     cnhStatus: normalizeCnhStatus(user.cnhStatus),
     matriz: user.matriz,
-    gestorId: getUserDisplayName(users, user.gestorId),
+    gestorNome: getUserDisplayName(users, user.gestorNome),
     cnhAnexo: user.cnhAnexo,
     observacao: user.observacao ?? "",
   };
@@ -445,7 +441,7 @@ export function SettingsScreen() {
 
   const [vehicleForm, setVehicleForm] = useState<NewVehiclePayload>(emptyVehicleForm);
   const [userForm, setUserForm] = useState<NewUserPayload>(() =>
-    buildInitialUserForm(currentUser.matriz, getUserDisplayName(users, currentUser.gestorId))
+    buildInitialUserForm(currentUser.matriz, currentUser.gestorNome)
   );
   const [vehicleFeedback, setVehicleFeedback] = useState<FeedbackState | null>(null);
   const [userFeedback, setUserFeedback] = useState<FeedbackState | null>(null);
@@ -465,7 +461,7 @@ export function SettingsScreen() {
   const orderedUsers = users
     .slice()
     .sort((left, right) => left.fullName.localeCompare(right.fullName, "pt-BR"));
-  const currentManagerDisplayName = getUserDisplayName(orderedUsers, currentUser.gestorId);
+  const currentManagerDisplayName = currentUser.gestorNome ?? "";
   const totalVehicles = vehicles.length;
   const isEditingVehicle = Boolean(editingVehicleId);
   const isEditingUser = Boolean(editingUserId);
@@ -731,7 +727,7 @@ export function SettingsScreen() {
                           icon="user"
                           title={user.fullName}
                           subtitle={`${user.role} · ${user.matricula}`}
-                          meta={`${user.areaDepartamento} | ${user.emailCorporativo}`}
+                          meta={`${user.areaDepartamento} | ${user.email}`}
                           badgeLabel={getCnhStatusLabel(user.cnhStatus)}
                           badgeTone={getCnhStatusTone(user.cnhStatus)}
                           onPress={() => openUserEditModal(user)}
@@ -970,24 +966,12 @@ export function SettingsScreen() {
         ) : null}
 
         <View style={styles.formStack}>
-          <View style={styles.row}>
-            <View style={styles.column}>
-              <FormField
-                label="Nome curto"
-                placeholder="Ex.: Ana Silva"
-                value={userForm.name}
-                onChangeText={(value) => updateUserField("name", value)}
-              />
-            </View>
-            <View style={styles.column}>
-              <FormField
-                label="Nome completo"
-                placeholder="Ex.: Ana Carolina Silva"
-                value={userForm.fullName}
-                onChangeText={(value) => updateUserField("fullName", value)}
-              />
-            </View>
-          </View>
+          <FormField
+            label="Nome completo"
+            placeholder="Ex.: Ana Carolina Silva"
+            value={userForm.fullName}
+            onChangeText={(value) => updateUserField("fullName", value)}
+          />
           <View style={styles.row}>
             <View style={styles.column}>
               <FormField
@@ -1033,10 +1017,10 @@ export function SettingsScreen() {
           <View style={styles.row}>
             <View style={styles.column}>
               <FormField
-                label="E-mail corporativo"
-                placeholder="ana.silva@sigma.local"
-                value={userForm.emailCorporativo}
-                onChangeText={(value) => updateUserField("emailCorporativo", value)}
+                label="Email"
+                placeholder="ana.silva@empresa.com"
+                value={userForm.email}
+                onChangeText={(value) => updateUserField("email", value)}
                 autoCapitalize="none"
               />
             </View>
@@ -1062,9 +1046,9 @@ export function SettingsScreen() {
               <FormField
                 label="Superior imediato"
                 placeholder={currentManagerDisplayName || currentUser.fullName}
-                value={userForm.gestorId}
-                onChangeText={(value) => updateUserField("gestorId", value)}
-                helper="Opcional. Informe nome, e-mail, matrícula ou ID de um colaborador existente."
+                value={userForm.gestorNome}
+                onChangeText={(value) => updateUserField("gestorNome", value)}
+                helper="Opcional. Informe o nome do superior imediato."
               />
             </View>
           </View>
@@ -1086,24 +1070,12 @@ export function SettingsScreen() {
               />
             </View>
           </View>
-          <View style={styles.row}>
-            <View style={styles.column}>
-              <FormField
-                label="UF de emissão"
-                placeholder="MG"
-                value={userForm.cnhUfEmissao}
-                onChangeText={(value) => updateUserField("cnhUfEmissao", value)}
-              />
-            </View>
-            <View style={styles.column}>
-              <ChoiceGroup
-                label="Status da CNH"
-                value={userForm.cnhStatus}
-                options={cnhStatuses}
-                onChange={(value) => updateUserField("cnhStatus", value as CnhStatus)}
-              />
-            </View>
-          </View>
+          <ChoiceGroup
+            label="Status da CNH"
+            value={userForm.cnhStatus}
+            options={cnhStatuses}
+            onChange={(value) => updateUserField("cnhStatus", value as CnhStatus)}
+          />
           <AttachmentField
             label="Anexo do documento do usuário"
             value={userForm.cnhAnexo}

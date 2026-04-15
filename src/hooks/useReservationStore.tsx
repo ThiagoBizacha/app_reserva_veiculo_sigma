@@ -105,22 +105,18 @@ interface ReservationStoreValue {
 const EMPTY_USER: User = {
   id: "unconfigured-user",
   userId: "unconfigured-user",
-  name: "Usuario",
   fullName: "Usuario nao configurado",
   cpf: "",
   gestorVeiculo: false,
   matricula: "",
   matriz: "",
   role: "Solicitante",
-  area: "",
   areaDepartamento: "",
   centroCusto: "",
   email: "",
-  emailCorporativo: "",
   telefone: "",
   cnhNumero: "",
   cnhCategoria: "",
-  cnhUfEmissao: "",
   cnhStatus: "Válida",
   cnhDataUltimaValidacao: new Date(0).toISOString(),
   cnhAnexo: "",
@@ -142,9 +138,7 @@ function userMatchesAuthIdentity(user: User, authUserId?: string, authEmail?: st
     return false;
   }
 
-  return [user.email, user.emailCorporativo].some(
-    (candidate) => normalizeEmail(candidate) === authEmail
-  );
+  return normalizeEmail(user.email) === authEmail;
 }
 
 const ReservationStoreContext = createContext<ReservationStoreValue | null>(null);
@@ -168,7 +162,7 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
     users.find((user) => userMatchesAuthIdentity(user, authUser?.id, authEmail)) ?? EMPTY_USER;
   const currentUserPermissions = getUserPermissions(currentUser);
   const currentUserId = currentUser.id;
-  const currentUserName = currentUser.name || authUser?.email || "Usuario";
+  const currentUserName = currentUser.fullName || authUser?.email || "Usuario";
   const hasLinkedCurrentUser = currentUser.id !== EMPTY_USER.id;
   const hasMinimumData = users.length > 0;
 
