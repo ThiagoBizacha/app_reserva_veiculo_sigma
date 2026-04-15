@@ -720,13 +720,13 @@ export function ReservationStoreProvider({ children }: PropsWithChildren) {
     );
   }
 
-  if (!isBootstrapping && users.length === 0) {
+  if (!isBootstrapping && isAuthenticated && users.length === 0) {
     return (
       <BlockingStateScreen
-        title="Backend sem usuarios"
-        description="O backend foi configurado, mas ainda nao existe nenhum usuario persistido. Execute a seed inicial antes de usar o app."
-        actionLabel="Atualizar"
-        onPress={() => void refreshRemoteState()}
+        title="Conta nao encontrada"
+        description="Sua sessao esta ativa mas nao foi possivel carregar os dados da sua conta. Saia e entre novamente."
+        actionLabel="Sair e entrar novamente"
+        onPress={() => void signOut()}
       />
     );
   }

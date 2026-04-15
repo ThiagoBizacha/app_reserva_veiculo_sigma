@@ -27,7 +27,7 @@ export default function TabsLayout() {
             resources: "truck",
             settings: "settings",
             "check-flow": "check-square",
-            admin: "settings",
+            admin: "bar-chart-2",
           };
 
           return <Feather name={iconMap[route.name] ?? "circle"} size={size} color={color} />;

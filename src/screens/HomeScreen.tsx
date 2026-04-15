@@ -1,4 +1,4 @@
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -12,7 +12,7 @@ import { getUserPermissions } from "@/utils/authorization";
 import type { User } from "@/types";
 
 export function HomeScreen() {
-  const { currentUser, currentUserName, getActionableReservations, getSummary } =
+  const { currentUser, getActionableReservations, getSummary } =
     useReservationStore();
   const { isSubmitting, signOut } = useAuthSession();
   const insets = useSafeAreaInsets();
@@ -68,30 +68,24 @@ export function HomeScreen() {
         style={[styles.header, { paddingTop: insets.top + spacing.sm }]}
       >
         <View style={styles.row}>
-          <Text numberOfLines={1} adjustsFontSizeToFit style={styles.headerTitle}>
+          <Text style={styles.headerTitle}>
             Reserva de Veículos
           </Text>
-          <View style={styles.userBlock}>
-            <Text style={styles.userName} numberOfLines={1}>
-              {currentUserName}
-            </Text>
-            <View style={styles.divider} />
-            <Pressable
-              accessibilityRole="button"
-              disabled={isSubmitting}
-              onPress={() => void handleSignOut()}
-              style={styles.exitButton}
-            >
-              <Feather name="log-out" size={12} color={colors.white} />
-              <Text style={styles.exitLabel}>Sair</Text>
-            </Pressable>
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            disabled={isSubmitting}
+            onPress={() => void handleSignOut()}
+            style={styles.exitButton}
+          >
+            <Feather name="log-out" size={12} color={colors.white} />
+            <Text style={styles.exitLabel}>Sair</Text>
+          </Pressable>
         </View>
       </LinearGradient>
 
       <View style={styles.bodyStack}>
         <View style={styles.tipInline}>
-          <MaterialCommunityIcons name="lightbulb-on-outline" size={16} color={colors.primary} />
+          <Feather name="zap" size={14} color={colors.primary} />
           <Text style={styles.tipText}>
             Use a agenda para escolher o veículo e reservar com menos etapas.
           </Text>
@@ -216,22 +210,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
-  },
-  userBlock: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-  },
-  userName: {
-    color: "rgba(255,255,255,0.85)",
-    fontSize: typography.tiny,
-    fontWeight: "600",
-    maxWidth: 110,
-  },
-  divider: {
-    width: 1,
-    height: 14,
-    backgroundColor: "rgba(255,255,255,0.3)",
   },
   exitButton: {
     flexDirection: "row",

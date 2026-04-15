@@ -51,6 +51,7 @@ function LoginField({
         secureTextEntry={secureTextEntry}
         autoCapitalize="none"
         autoCorrect={false}
+        autoComplete="off"
         style={[styles.input, compact && styles.inputCompact]}
       />
       {trailing}
@@ -110,7 +111,7 @@ export function LoginScreen() {
                   <LoginField
                     compact={isCompact}
                     icon="user"
-                    placeholder="TBIZACHA ou nome@empresa.com"
+                    placeholder=""
                     value={identifier}
                     onChangeText={(value) => {
                       clearAuthError();
