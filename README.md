@@ -43,6 +43,14 @@ Perfis suportados nesta fase:
 
 ```text
 app/
+docs/
+  README.md
+  PROJECT_CONTEXT.md
+  DOCUMENTACAO_TECNICA.md
+  GUIA_DEPLOY.md
+  GUIA_PROVISIONAMENTO_USUARIOS.md
+  TEMPLATE_ARQUITETURA_BACKEND_DEPLOY.md
+  todo.md
 src/
   backend/
   hooks/
@@ -59,6 +67,17 @@ scripts/
 .env.example
 README.md
 ```
+
+## Documentacao
+
+A documentacao complementar do projeto agora fica centralizada em [`docs/`](./docs/README.md):
+
+- contexto funcional e escopo em [`docs/PROJECT_CONTEXT.md`](./docs/PROJECT_CONTEXT.md)
+- documentacao tecnica em [`docs/DOCUMENTACAO_TECNICA.md`](./docs/DOCUMENTACAO_TECNICA.md)
+- guia de deploy em [`docs/GUIA_DEPLOY.md`](./docs/GUIA_DEPLOY.md)
+- guia de provisionamento em [`docs/GUIA_PROVISIONAMENTO_USUARIOS.md`](./docs/GUIA_PROVISIONAMENTO_USUARIOS.md)
+- template arquitetural reutilizavel em [`docs/TEMPLATE_ARQUITETURA_BACKEND_DEPLOY.md`](./docs/TEMPLATE_ARQUITETURA_BACKEND_DEPLOY.md)
+- backlog tecnico em [`docs/todo.md`](./docs/todo.md)
 
 ## Como configurar o backend
 
